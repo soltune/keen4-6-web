@@ -1,0 +1,287 @@
+/* ===========================================================================
+   Commander Keen 4-6 (Web) — shell styles
+   Retro-launcher aesthetic: deep space black, EGA-ish accent, pixel-crisp.
+   =========================================================================== */
+
+:root {
+  --bg: #05060a;
+  --panel: #11131d;
+  --panel-edge: #2a2f45;
+  --ink: #e8ecff;
+  --muted: #8b93b8;
+  --accent: #ffd23f; /* Keen yellow-ish */
+  --accent-2: #4aa3ff;
+  --danger: #ff5a5a;
+  font-family: ui-monospace, "SFMono-Regular", "Cascadia Mono", Menlo, Consolas,
+    monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--ink);
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+/* --- Game stage / framebuffer canvas --------------------------------------- */
+#stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  background: #000;
+}
+
+#screen {
+  /* Size is set in px by the display layer (aspect-preserving). */
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  background: #000;
+  display: block;
+}
+
+/* --- Generic overlay panels (selector, dialogs) ---------------------------- */
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(
+    120% 120% at 50% 0%,
+    rgba(74, 163, 255, 0.08),
+    rgba(0, 0, 0, 0.86)
+  );
+  z-index: 20;
+}
+
+.panel {
+  width: min(720px, 92vw);
+  background: linear-gradient(180deg, var(--panel), #0b0d15);
+  border: 1px solid var(--panel-edge);
+  border-radius: 14px;
+  padding: 28px clamp(18px, 4vw, 40px) 32px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.title {
+  margin: 0 0 4px;
+  font-size: clamp(20px, 4.4vw, 30px);
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.6);
+}
+
+.subtitle {
+  margin: 0 0 24px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* --- Episode selector ------------------------------------------------------ */
+.episode-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+@media (max-width: 560px) {
+  .episode-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.episode {
+  appearance: none;
+  text-align: left;
+  cursor: pointer;
+  color: var(--ink);
+  background: #0c0f1a;
+  border: 1px solid var(--panel-edge);
+  border-radius: 12px;
+  padding: 16px;
+  transition: transform 0.08s ease, border-color 0.12s ease, background 0.12s ease;
+}
+.episode:hover:not(:disabled),
+.episode:focus-visible {
+  transform: translateY(-2px);
+  border-color: var(--accent-2);
+  background: #0f1424;
+  outline: none;
+}
+.episode:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.episode .num {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--accent);
+}
+.episode .name {
+  margin-top: 6px;
+  font-size: 14px;
+}
+.episode .status {
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.episode .status.ok {
+  color: #6fe39b;
+}
+.episode .status.missing {
+  color: var(--danger);
+}
+
+.hint {
+  margin-top: 22px;
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.hint kbd {
+  background: #1a1f30;
+  border: 1px solid var(--panel-edge);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  padding: 1px 6px;
+  font-size: 11px;
+}
+
+/* --- HUD (top-right controls: fullscreen, etc.) ---------------------------- */
+#hud {
+  position: fixed;
+  top: env(safe-area-inset-top, 8px);
+  right: env(safe-area-inset-right, 8px);
+  display: flex;
+  gap: 8px;
+  z-index: 15;
+}
+.hud-btn {
+  appearance: none;
+  cursor: pointer;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+  color: var(--ink);
+  background: rgba(17, 19, 29, 0.7);
+  border: 1px solid var(--panel-edge);
+  border-radius: 9px;
+  backdrop-filter: blur(6px);
+}
+.hud-btn:active {
+  transform: scale(0.94);
+}
+
+/* --- Virtual gamepad (touch) ----------------------------------------------- */
+#virtualpad {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+}
+#virtualpad .vp-zone {
+  position: absolute;
+  bottom: max(env(safe-area-inset-bottom, 16px), 16px);
+  pointer-events: auto;
+}
+#virtualpad .vp-dpad {
+  left: max(env(safe-area-inset-left, 16px), 16px);
+  width: 168px;
+  height: 168px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 6px;
+}
+#virtualpad .vp-actions {
+  right: max(env(safe-area-inset-right, 16px), 16px);
+  display: grid;
+  grid-template-columns: auto auto;
+  column-gap: 14px;
+  row-gap: 10px;
+  align-items: end;
+  justify-items: center;
+}
+/* FIRE centered above the POGO/JUMP row. A 3-wide flex row used to overlap the
+   left D-pad in portrait (narrow width), causing FIRE misfires; a 2-wide bottom
+   row stays clear of it. */
+.vp-fire { grid-area: 1 / 1 / 2 / 3; }
+.vp-pogo { grid-area: 2 / 1 / 3 / 2; }
+.vp-jump { grid-area: 2 / 2 / 3 / 3; }
+.vp-key {
+  -webkit-user-select: none;
+  user-select: none;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  background: rgba(20, 24, 38, 0.55);
+  border: 1px solid rgba(120, 140, 200, 0.35);
+  border-radius: 12px;
+  backdrop-filter: blur(4px);
+}
+.vp-key.pressed {
+  background: rgba(74, 163, 255, 0.5);
+  border-color: var(--accent-2);
+}
+.vp-dpad .vp-key {
+  border-radius: 10px;
+}
+.vp-round {
+  width: 74px;
+  height: 74px;
+  border-radius: 50%;
+  font-size: 14px;
+}
+.vp-round.big {
+  width: 84px;
+  height: 84px;
+}
+#virtualpad .vp-meta {
+  top: max(env(safe-area-inset-top, 12px), 12px);
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: auto;
+  display: flex;
+  gap: 10px;
+}
+.vp-pill {
+  padding: 0 14px;
+  height: 30px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  border-radius: 15px;
+}
+
+/* dpad cell placement */
+.vp-up { grid-area: 1 / 2; }
+.vp-left { grid-area: 2 / 1; }
+.vp-right { grid-area: 2 / 3; }
+.vp-down { grid-area: 3 / 2; }
+
+.hidden {
+  display: none !important;
+}

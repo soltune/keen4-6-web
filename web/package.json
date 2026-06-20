@@ -1,0 +1,20 @@
+{
+  "name": "keen4-6-web",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Browser port of Commander Keen 4-6 (based on K1n9_Duk3's reconstructed source)",
+  "license": "GPL-2.0-or-later",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "extract": "node ../tools/extract.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.61.0",
+    "typescript": "^5.6.0",
+    "vite": "^5.4.0"
+  }
+}

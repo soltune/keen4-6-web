@@ -1,0 +1,13 @@
+# macOS
+.DS_Store
+
+# 著作権のあるゲームデータ — コミット禁止（利用者が各自所有のものを用意する）
+dos/
+keen_complete_pack/
+web/public/engine/*.data
+
+# 削除予定の隔離ディレクトリ
+_deprecated/
+
+# 注: web/ と engine/ には個別の .gitignore があり、
+#     node_modules / dist / build / public/data は既に除外済み。

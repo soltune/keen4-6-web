@@ -1,0 +1,7 @@
+node_modules/
+dist/
+*.local
+.DS_Store
+# Extracted game data is derived from the user's own copyrighted files and must
+# not be committed.
+public/data/
