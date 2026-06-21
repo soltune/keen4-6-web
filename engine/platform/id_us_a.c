@@ -50,3 +50,18 @@ int US_RndT (void)
 	rndindex = (rndindex + 1) & 0xff;
 	return rndtable[rndindex];
 }
+
+/*
+ * Rewind support — expose the table index so an in-memory state snapshot can
+ * capture and restore the exact position in the pseudo-random sequence (enemy
+ * AI / effects then resume identically after a rewind). See ck_rewind.c.
+ */
+int US_GetRndIndex (void)
+{
+	return rndindex;
+}
+
+void US_SetRndIndex (int v)
+{
+	rndindex = v & 0xff;
+}

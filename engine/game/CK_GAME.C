@@ -21,6 +21,7 @@
  */
 
 #include "CK_DEF.H"
+#include "ck_rewind.h"
 
 /*
 =============================================================================
@@ -106,12 +107,45 @@ void NewGame(void)
 
 void GameOver(void)
 {
+	longword deadline;
+	boolean rewound = false;
+
 	VW_FixRefreshBuffer();
 	US_CenterWindow(16, 3);
 	US_PrintCentered("Game Over!");
 	VW_UpdateScreen();
 	IN_ClearKeysDown();
-	IN_UserInput(4*TickBase, false);
+
+	// Rewind (web port): hold the rewind key to undo the game over and resume
+	// play — same UI as the death dialog. Otherwise wait ~4s or a key, as before
+	// (this loop replaces IN_UserInput(4*TickBase,false) while adding rewind).
+	deadline = TimeCount + 4*TickBase;
+	while (TimeCount < deadline)
+	{
+		if (Keyboard[sc_BackSpace] && Rewind_HasHistory())
+		{
+			int n;
+			rewound = true;
+			RF_CalcTics();
+			for (n = 0; n < tics; n++)
+				if (!Rewind_Step())
+					break;
+			RF_ForceRefresh();
+			deadline = TimeCount + 4*TickBase;	// keep the window open while rewinding
+			continue;
+		}
+		if (rewound)
+		{
+			// key released after rewinding -> resume from the restored point
+			playstate = ex_stillplaying;
+			IN_ClearKeysDown();
+			return;
+		}
+		if (IN_IsUserInput())
+			break;
+		CKWEB_Yield();
+	}
+	IN_ClearKeysDown();
 }
 #endif
 
@@ -694,6 +728,7 @@ void EndDemoRecord(void)
 void HandleDeath(void)
 {
 	Uint16 y, color, top, bottom, selection, w, h;
+	boolean rewound = false;
 
 	_fstrcpy(str, levelnames[mapon]);
 	SizeText(str, &w, &h);
@@ -720,6 +755,27 @@ void HandleDeath(void)
 		selection = 0;
 		while (true)
 		{
+			// Rewind (web port): hold the rewind key to wind the death back and
+			// resume play — the player needn't even notice they hit this dialog.
+			if (Keyboard[sc_BackSpace] && Rewind_HasHistory())
+			{
+				int n;
+				rewound = true;
+				RF_CalcTics();
+				for (n = 0; n < tics; n++)
+					if (!Rewind_Step())
+						break;
+				RF_ForceRefresh();
+				continue;
+			}
+			if (rewound)
+			{
+				// key released after rewinding -> resume from the restored point
+				playstate = ex_stillplaying;
+				IN_ClearKeysDown();
+				return;
+			}
+
 			if (selection)
 			{
 				y = bottom;
@@ -888,6 +944,8 @@ loaded:
 
 		case ex_died:
 			HandleDeath();
+			if (playstate == ex_stillplaying)
+				goto loaded;	// rewound out of the death -> resume, no re-setup
 			break;
 
 #if defined KEEN4
@@ -992,6 +1050,8 @@ completed:
 	} while (gamestate.lives >= 0);
 
 	GameOver();
+	if (playstate == ex_stillplaying)
+		goto loaded;		// rewound out of the game over -> resume, no re-setup
 
 check_score:
 #if defined KEEN4

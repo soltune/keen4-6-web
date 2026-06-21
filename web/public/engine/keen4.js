@@ -46,7 +46,7 @@ if (ENVIRONMENT_IS_NODE) {
 
 // --pre-jses are emitted after the Module integration code, so that they can
 // refer to Module (if they choose; they can also define Module)
-// include: /var/folders/tg/b7lvg6ss55s_7f36rcx04tlc0000gn/T/tmpfdriblzz.js
+// include: /var/folders/tg/b7lvg6ss55s_7f36rcx04tlc0000gn/T/tmpc85x3veh.js
 
   if (!Module['expectedDataFileDownloads']) Module['expectedDataFileDownloads'] = 0;
   Module['expectedDataFileDownloads']++;
@@ -178,7 +178,7 @@ if (ENVIRONMENT_IS_NODE) {
 
   })();
 
-// end include: /var/folders/tg/b7lvg6ss55s_7f36rcx04tlc0000gn/T/tmpfdriblzz.js
+// end include: /var/folders/tg/b7lvg6ss55s_7f36rcx04tlc0000gn/T/tmpc85x3veh.js
 
 
 var programArgs = [];
@@ -4558,6 +4558,7 @@ var _CKWEB_Yield,
   _free,
   _CKWEB_PlayerState,
   _CKWEB_Warp,
+  _CKWEB_SetLives,
   _CKWEB_Boot,
   _CKWEB_TimeCount,
   _CKWEB_PersistFS,
@@ -4598,6 +4599,7 @@ function assignWasmExports(wasmExports) {
   _free = Module['_free'] = wasmExports['free'];
   _CKWEB_PlayerState = Module['_CKWEB_PlayerState'] = wasmExports['CKWEB_PlayerState'];
   _CKWEB_Warp = Module['_CKWEB_Warp'] = wasmExports['CKWEB_Warp'];
+  _CKWEB_SetLives = Module['_CKWEB_SetLives'] = wasmExports['CKWEB_SetLives'];
   _CKWEB_Boot = Module['_CKWEB_Boot'] = wasmExports['CKWEB_Boot'];
   _CKWEB_TimeCount = Module['_CKWEB_TimeCount'] = wasmExports['CKWEB_TimeCount'];
   _CKWEB_PersistFS = Module['_CKWEB_PersistFS'] = wasmExports['CKWEB_PersistFS'];

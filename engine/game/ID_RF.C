@@ -1269,6 +1269,45 @@ void RF_ForceRefresh (void)
 /*
 =====================
 =
+= RF_RewindSprite{Size,Save,Load}
+=
+= Rewind support (web port): the sprite-tracking pool — spritearray plus the
+= per-priority list heads (prioritystart) and the free-list head (spritefreeptr)
+= — is part of the live game state, because objtype.sprite and the score box
+= point into spritearray. A rewind snapshot therefore captures and restores the
+= whole pool verbatim. spritearray is a fixed-address array, so the intra-pool
+= linkage pointers (prevptr/nextsprite and the heads) stay valid across a
+= restore; the caller then RF_ForceRefresh()es to repaint from the new state.
+=
+=====================
+*/
+
+unsigned RF_RewindSpriteSize (void)
+{
+	return sizeof(spritearray) + sizeof(prioritystart) + sizeof(spritefreeptr);
+}
+
+void RF_RewindSpriteSave (void *buf)
+{
+	byte *p = (byte *)buf;
+	memcpy (p, spritearray, sizeof(spritearray));		p += sizeof(spritearray);
+	memcpy (p, prioritystart, sizeof(prioritystart));	p += sizeof(prioritystart);
+	memcpy (p, &spritefreeptr, sizeof(spritefreeptr));
+}
+
+void RF_RewindSpriteLoad (const void *buf)
+{
+	const byte *p = (const byte *)buf;
+	memcpy (spritearray, p, sizeof(spritearray));		p += sizeof(spritearray);
+	memcpy (prioritystart, p, sizeof(prioritystart));	p += sizeof(prioritystart);
+	memcpy (&spritefreeptr, p, sizeof(spritefreeptr));
+}
+
+//===========================================================================
+
+/*
+=====================
+=
 = RF_MapToMap
 =
 = Copies a block of tiles (all three planes) from one point

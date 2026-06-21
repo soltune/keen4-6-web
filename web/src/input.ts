@@ -22,7 +22,7 @@
 export type VirtualButton =
   | "up" | "down" | "left" | "right"
   | "jump" | "pogo" | "fire"
-  | "status" | "back" | "pause";
+  | "status" | "back" | "pause" | "rewind";
 
 /** The slice the on-screen virtual pad drives. */
 export interface VirtualSink {
@@ -41,13 +41,14 @@ export interface VirtualSink {
 const CODES: Record<VirtualButton, readonly string[]> = {
   up: ["ArrowUp"], down: ["ArrowDown"], left: ["ArrowLeft"], right: ["ArrowRight"],
   jump: ["ControlLeft"], pogo: ["AltLeft"], fire: ["Space"],
-  status: ["Enter"], back: ["Escape"], pause: ["KeyP"],
+  status: ["Enter"], back: ["Escape"], pause: ["KeyP"], rewind: ["Backspace"],
 };
 
 /* Order for codes pressed within one frame. The menu keys off LastScan (the
    last scancode of the frame), so confirm/back must be emitted LAST to win it
    when pressed alongside a direction. Releases don't touch LastScan. */
 const PRESS_ORDER = [
+  "Backspace",
   "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight",
   "AltLeft", "ControlLeft", "Space", "KeyP",
   "Enter", "Escape",
@@ -133,6 +134,7 @@ export class InputBridge implements VirtualSink {
       if (pressed(1)) out.add("pogo");
       if (pressed(2)) out.add("fire");
       if (pressed(3)) out.add("status");
+      if (pressed(4) || pressed(6)) out.add("rewind");	// L1/L2 = hold to rewind
       if (pressed(8) || pressed(9)) out.add("back");
     }
     if (live !== this.padCount) {

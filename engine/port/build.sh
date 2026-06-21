@@ -44,7 +44,7 @@ CORE=(CK_MAIN CK_GAME CK_PLAY CK_STATE CK_KEEN CK_KEEN2 CK_TEXT CK_DEMO)
 PLATFORM=(ID_MM ID_CA ID_VW ID_RF ID_IN ID_SD ID_US_1 ID_US_2)
 # Web-only support TUs (no DOS-original counterpart): the argc/errlist/Borland
 # shims and the embedded OPL2 FM synth. Compiled once per episode too.
-SUPPORT=(engine/platform/id_platform.c engine/platform/opl2.c engine/platform/nukedopl/opl3.c engine/platform/id_us_a.c engine/platform/id_rf_a.c engine/platform/ck_web.c)
+SUPPORT=(engine/platform/id_platform.c engine/platform/opl2.c engine/platform/nukedopl/opl3.c engine/platform/id_us_a.c engine/platform/id_rf_a.c engine/platform/ck_web.c engine/platform/ck_rewind.c)
 
 compile() { # $1=src  $2=episodeDir  $3=objsuffix
   local src=$1 ep=$2 obj="$OUT/$(basename "${1%.C}")_$3.o"

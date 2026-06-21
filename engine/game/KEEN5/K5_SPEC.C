@@ -36,6 +36,7 @@ Contains (in this order):
 */
 
 #include "CK_DEF.H"
+#include "ck_rewind.h"
 
 enum {
 	HELP_LUMP,        //  0
@@ -908,7 +909,7 @@ void GameOver(void)
 		MoveStars();
 		VW_UpdateScreen();
 
-		do {} while (TimeCount-lasttimecount < 4);
+		do { CKWEB_Yield(); } while (TimeCount-lasttimecount < 4);	// [web port] yield so TimeCount advances (ASYNCIFY)
 
 		if (LastScan)
 			break;
@@ -1052,12 +1053,12 @@ void GameOver(void)
 		lasttimecount = TimeCount;
 		MoveStars(0x2000);
 		SetCrtc(0x2000);
-		do {} while (TimeCount-lasttimecount < 4);
+		do { CKWEB_Yield(); } while (TimeCount-lasttimecount < 4);	// [web port] yield so TimeCount advances (ASYNCIFY)
 
 		lasttimecount = TimeCount;
 		MoveStars(0);
 		SetCrtc(0);
-		do {} while (TimeCount-lasttimecount < 4);
+		do { CKWEB_Yield(); } while (TimeCount-lasttimecount < 4);	// [web port] yield so TimeCount advances (ASYNCIFY)
 
 		if (LastScan)
 			goto gameover;
@@ -1072,7 +1073,37 @@ gameover:
 	StartMusic(18);
 	VWB_DrawPic(32, 80, GAMEOVERPIC);
 	VW_UpdateScreen();
-	IN_UserInput(24*TickBase, false);
+	// Rewind (web port): hold the rewind key to undo the game over and resume
+	// play (same UI as CK4/CK6's GameOver). Otherwise wait ~24s or a key.
+	{
+		longword deadline = TimeCount + 24*TickBase;
+		boolean rewound = false;
+		while (TimeCount < deadline)
+		{
+			if (Keyboard[sc_BackSpace] && Rewind_HasHistory())
+			{
+				int n;
+				rewound = true;
+				RF_CalcTics();
+				for (n = 0; n < tics; n++)
+					if (!Rewind_Step())
+						break;
+				RF_ForceRefresh();
+				deadline = TimeCount + 24*TickBase;
+				continue;
+			}
+			if (rewound)
+			{
+				playstate = ex_stillplaying;
+				IN_ClearKeysDown();
+				StopMusic();
+				return;
+			}
+			if (IN_IsUserInput())
+				break;
+			CKWEB_Yield();
+		}
+	}
 	StopMusic();
 }
 

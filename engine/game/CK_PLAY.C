@@ -21,6 +21,7 @@
  */
 
 #include "CK_DEF.H"
+#include "ck_rewind.h"
 
 /*
 =============================================================================
@@ -1524,6 +1525,52 @@ void WorldScrollScreen(objtype *ob)
 ==================
 */
 
+/* ===========================================================================
+   Rewind support — capture/restore the per-level loop state that lives in this
+   file. ck_rewind.c snapshots gamestate/objects/map/sprites, but these
+   file-local globals also change during play and feed the scroller. Most
+   important: `keenkilled` — ScrollScreen early-outs while it is set, so a
+   rewind taken during a death (the dying animation still records frames) would
+   otherwise leave keenkilled set and the screen frozen. `centerlevel` is the
+   vertical-scroll centre; the rest are death/invincibility timers and input
+   hysteresis. Packed into one struct so size/order can't drift.
+   =========================================================================== */
+typedef struct {
+	boolean	keenkilled, godmode, scrollup;
+	boolean	jumpbutton, jumpheld, pogobutton, pogoheld, firebutton, fireheld, upheld;
+	Sint16	invincible, oldfirecount, vislines, groundslam;
+	Uint16	centerlevel, windowofs;
+} ckrewindstate;
+
+unsigned CK_RewindStateSize (void)
+{
+	return sizeof(ckrewindstate);
+}
+
+void CK_RewindStateSave (void *buf)
+{
+	ckrewindstate *s = (ckrewindstate *)buf;
+	s->keenkilled = keenkilled;	s->godmode = godmode;		s->scrollup = scrollup;
+	s->jumpbutton = jumpbutton;	s->jumpheld = jumpheld;
+	s->pogobutton = pogobutton;	s->pogoheld = pogoheld;
+	s->firebutton = firebutton;	s->fireheld = fireheld;		s->upheld = upheld;
+	s->invincible = invincible;	s->oldfirecount = oldfirecount;
+	s->vislines = vislines;		s->groundslam = groundslam;
+	s->centerlevel = centerlevel;	s->windowofs = windowofs;
+}
+
+void CK_RewindStateLoad (const void *buf)
+{
+	const ckrewindstate *s = (const ckrewindstate *)buf;
+	keenkilled = s->keenkilled;	godmode = s->godmode;		scrollup = s->scrollup;
+	jumpbutton = s->jumpbutton;	jumpheld = s->jumpheld;
+	pogobutton = s->pogobutton;	pogoheld = s->pogoheld;
+	firebutton = s->firebutton;	fireheld = s->fireheld;		upheld = s->upheld;
+	invincible = s->invincible;	oldfirecount = s->oldfirecount;
+	vislines = s->vislines;		groundslam = s->groundslam;
+	centerlevel = s->centerlevel;	windowofs = s->windowofs;
+}
+
 void ScrollScreen(objtype *ob)
 {
 	Sint16 xscroll, yscroll, pix, speed;
@@ -2189,6 +2236,8 @@ void PlayLoop(void)
 
 	CenterActor(player);
 
+	Rewind_Reset();		// clear the rewind history at the start of each level
+
 	if (DemoMode)
 	{
 		US_InitRndT(false);
@@ -2202,6 +2251,27 @@ void PlayLoop(void)
 	do
 	{
 		PollControls();
+
+		// Rewind (web port): while the rewind key is held, restore the previous
+		// frame and skip this frame's update entirely. Once the history runs
+		// out Rewind_Step is a no-op, so the game stays paused at the oldest
+		// snapshot (rather than creeping forward). Disabled during demos.
+		if (Keyboard[sc_BackSpace] && !DemoMode)
+		{
+			// Rewind (web port): wind back one frame's worth of recorded tics,
+			// then repaint once. RF_CalcTics yields to the browser and reports
+			// the elapsed tics, so the rewind runs at the same speed gameplay
+			// recorded — and the expensive full redraw (RF_ForceRefresh) happens
+			// once per frame, NOT once per restored snapshot (which made it
+			// crawl). Holds at the oldest snapshot once the history runs out.
+			int n;
+			RF_CalcTics();
+			for (n = 0; n < tics; n++)
+				if (!Rewind_Step())
+					break;
+			RF_ForceRefresh();
+			continue;
+		}
 
 //
 // go through state changes and propose movements
@@ -2415,6 +2485,11 @@ void PlayLoop(void)
 #endif
 		}
 
+		// Rewind (web port): snapshot this frame. Only while still playing, so
+		// the history never holds a death / level-exit frame.
+		if (playstate == ex_stillplaying)
+			Rewind_Record();
+
 	} while (playstate == ex_stillplaying);
 
 	ingame = false;
@@ -2437,6 +2512,8 @@ EMSCRIPTEN_KEEPALIVE int CKWEB_PlayerState (int what)
 		case 5: return player ? (int)player->obclass : -1;
 		case 6: return (int)gamestate.mapon;	// 0 = world map, 1..18 = a level
 		case 7: return player ? (int)player->state->progress : -1;
+		case 8: return keenkilled ? 1 : 0;	// death flag (rewind-after-death test)
+		case 9: return (int)gamestate.lives;	// remaining lives (game-over test)
 		default: return -2;
 	}
 }
@@ -2455,4 +2532,12 @@ EMSCRIPTEN_KEEPALIVE int CKWEB_Warp (int level)
 	gamestate.mapon = level;
 	playstate = ex_warped;
 	return 1;
+}
+
+/* [web port] test-only: force the remaining-lives count, to reach a game over
+   without dying repeatedly. */
+EMSCRIPTEN_KEEPALIVE void CKWEB_SetLives (int n)
+{
+	if (ingame)
+		gamestate.lives = n;
 }

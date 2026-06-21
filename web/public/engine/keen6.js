@@ -46,7 +46,7 @@ if (ENVIRONMENT_IS_NODE) {
 
 // --pre-jses are emitted after the Module integration code, so that they can
 // refer to Module (if they choose; they can also define Module)
-// include: /var/folders/tg/b7lvg6ss55s_7f36rcx04tlc0000gn/T/tmpwmo4777m.js
+// include: /var/folders/tg/b7lvg6ss55s_7f36rcx04tlc0000gn/T/tmpqsluag0b.js
 
   if (!Module['expectedDataFileDownloads']) Module['expectedDataFileDownloads'] = 0;
   Module['expectedDataFileDownloads']++;
@@ -178,7 +178,7 @@ if (ENVIRONMENT_IS_NODE) {
 
   })();
 
-// end include: /var/folders/tg/b7lvg6ss55s_7f36rcx04tlc0000gn/T/tmpwmo4777m.js
+// end include: /var/folders/tg/b7lvg6ss55s_7f36rcx04tlc0000gn/T/tmpqsluag0b.js
 
 
 var programArgs = [];
@@ -4540,12 +4540,13 @@ var _CKWEB_Yield,
   _main,
   _CKWEB_PlayerState,
   _CKWEB_Warp,
+  _CKWEB_SetLives,
+  _malloc,
+  _free,
   _CKWEB_Boot,
   _CKWEB_TimeCount,
   _CKWEB_PersistFS,
   _CKWEB_KeyEvent,
-  _free,
-  _malloc,
   _SD_AudioRender,
   _CKWEB_FlushConfig,
   _VW_Present,
@@ -4580,12 +4581,13 @@ function assignWasmExports(wasmExports) {
   _main = Module['_main'] = wasmExports['main'];
   _CKWEB_PlayerState = Module['_CKWEB_PlayerState'] = wasmExports['CKWEB_PlayerState'];
   _CKWEB_Warp = Module['_CKWEB_Warp'] = wasmExports['CKWEB_Warp'];
+  _CKWEB_SetLives = Module['_CKWEB_SetLives'] = wasmExports['CKWEB_SetLives'];
+  _malloc = Module['_malloc'] = wasmExports['malloc'];
+  _free = Module['_free'] = wasmExports['free'];
   _CKWEB_Boot = Module['_CKWEB_Boot'] = wasmExports['CKWEB_Boot'];
   _CKWEB_TimeCount = Module['_CKWEB_TimeCount'] = wasmExports['CKWEB_TimeCount'];
   _CKWEB_PersistFS = Module['_CKWEB_PersistFS'] = wasmExports['CKWEB_PersistFS'];
   _CKWEB_KeyEvent = Module['_CKWEB_KeyEvent'] = wasmExports['CKWEB_KeyEvent'];
-  _free = Module['_free'] = wasmExports['free'];
-  _malloc = Module['_malloc'] = wasmExports['malloc'];
   _SD_AudioRender = Module['_SD_AudioRender'] = wasmExports['SD_AudioRender'];
   _CKWEB_FlushConfig = Module['_CKWEB_FlushConfig'] = wasmExports['CKWEB_FlushConfig'];
   _VW_Present = Module['_VW_Present'] = wasmExports['VW_Present'];
