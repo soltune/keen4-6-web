@@ -1190,6 +1190,19 @@ USL_XORICursor(int x,int y,char *s,word cursor)
 //              returned
 //
 ///////////////////////////////////////////////////////////////////////////
+/* [web port] True while US_LineInput is collecting typed text (save-game name,
+   high-score initials, cheat prompt). The JS shell reads this via
+   CKWEB_IsTextInput() to suspend letter-key hotkeys (e.g. F = fullscreen) so the
+   letters are typed into the field instead of triggering the shortcut. */
+#include <emscripten.h>
+boolean	ck_webTextInput;
+
+EMSCRIPTEN_KEEPALIVE
+int CKWEB_IsTextInput (void)
+{
+	return ck_webTextInput ? 1 : 0;
+}
+
 boolean
 US_LineInput(int x,int y,char *buf,char *def,boolean escok,
 				int maxchars,int maxwidth)
@@ -1207,6 +1220,8 @@ US_LineInput(int x,int y,char *buf,char *def,boolean escok,
 	longword        lasttime;
 
 	VW_HideCursor();
+
+	ck_webTextInput = true;		// [web port] suspend letter-key hotkeys
 
 	if (def)
 		strcpy(s,def);
@@ -1368,5 +1383,6 @@ US_LineInput(int x,int y,char *buf,char *def,boolean escok,
 	VW_UpdateScreen();
 
 	IN_ClearKeysDown();
+	ck_webTextInput = false;	// [web port] re-enable letter-key hotkeys
 	return(result);
 }

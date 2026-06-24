@@ -1191,9 +1191,37 @@ IN_UserInput(longword delay,boolean clear)
 EMSCRIPTEN_KEEPALIVE
 void CKWEB_KeyEvent (int scancode, int down)
 {
+	char	c;
+
 	if (scancode <= 0 || scancode >= NumCodes)
 		return;
 	Keyboard[scancode] = down ? true : false;
-	if (down)
-		LastScan = (ScanCode)scancode;
+	if (!down)
+		return;
+
+	LastScan = (ScanCode)scancode;
+
+	/* [web port] Reproduce the scancode->ASCII step the DOS keyboard ISR
+	   (INL_KeyService) performed, so US_LineInput name entry / high-score
+	   initials / cheat prompts receive typed characters via LastASCII. Same
+	   ASCIINames/ShiftNames tables and US layout as the original; Shift and
+	   CapsLock state come from Keyboard[] (the shift keys are forwarded by the
+	   JS shell just like any other key). */
+	if (scancode == sc_CapsLock)
+		CapsLock ^= true;
+
+	if (Keyboard[sc_LShift] || Keyboard[sc_RShift])		// If shifted
+	{
+		c = ShiftNames[scancode];
+		if ((c >= 'A') && (c <= 'Z') && CapsLock)
+			c += 'a' - 'A';
+	}
+	else
+	{
+		c = ASCIINames[scancode];
+		if ((c >= 'a') && (c <= 'z') && CapsLock)
+			c -= 'a' - 'A';
+	}
+	if (c)
+		LastASCII = c;
 }

@@ -46,7 +46,7 @@ if (ENVIRONMENT_IS_NODE) {
 
 // --pre-jses are emitted after the Module integration code, so that they can
 // refer to Module (if they choose; they can also define Module)
-// include: /var/folders/tg/b7lvg6ss55s_7f36rcx04tlc0000gn/T/tmpc85x3veh.js
+// include: /var/folders/tg/b7lvg6ss55s_7f36rcx04tlc0000gn/T/tmp_16007i5.js
 
   if (!Module['expectedDataFileDownloads']) Module['expectedDataFileDownloads'] = 0;
   Module['expectedDataFileDownloads']++;
@@ -178,7 +178,7 @@ if (ENVIRONMENT_IS_NODE) {
 
   })();
 
-// end include: /var/folders/tg/b7lvg6ss55s_7f36rcx04tlc0000gn/T/tmpc85x3veh.js
+// end include: /var/folders/tg/b7lvg6ss55s_7f36rcx04tlc0000gn/T/tmp_16007i5.js
 
 
 var programArgs = [];
@@ -4565,6 +4565,7 @@ var _CKWEB_Yield,
   _CKWEB_KeyEvent,
   _SD_AudioRender,
   _CKWEB_FlushConfig,
+  _CKWEB_IsTextInput,
   _VW_Present,
   _VW_GetFramebuffer,
   _VW_ScreenWidth,
@@ -4606,6 +4607,7 @@ function assignWasmExports(wasmExports) {
   _CKWEB_KeyEvent = Module['_CKWEB_KeyEvent'] = wasmExports['CKWEB_KeyEvent'];
   _SD_AudioRender = Module['_SD_AudioRender'] = wasmExports['SD_AudioRender'];
   _CKWEB_FlushConfig = Module['_CKWEB_FlushConfig'] = wasmExports['CKWEB_FlushConfig'];
+  _CKWEB_IsTextInput = Module['_CKWEB_IsTextInput'] = wasmExports['CKWEB_IsTextInput'];
   _VW_Present = Module['_VW_Present'] = wasmExports['VW_Present'];
   _VW_GetFramebuffer = Module['_VW_GetFramebuffer'] = wasmExports['VW_GetFramebuffer'];
   _VW_ScreenWidth = Module['_VW_ScreenWidth'] = wasmExports['VW_ScreenWidth'];

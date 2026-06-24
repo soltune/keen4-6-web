@@ -22,6 +22,7 @@ export interface KeenWasm {
   _CKWEB_Boot(): void;
   _main(): Promise<void> | void;
   _CKWEB_KeyEvent(scancode: number, down: number): void;
+  _CKWEB_IsTextInput?(): number;
   _CKWEB_PlayerState(what: number): number;
   _CKWEB_Warp(level: number): number;
   _VW_Present(): void;
@@ -175,6 +176,13 @@ export class WasmEngine {
   /** In-engine "warp to level" (the W-cheat effect). Returns 1 if queued. */
   warp(level: number): number {
     return this.m ? this.m._CKWEB_Warp(level) : 0;
+  }
+
+  /** True while the engine is collecting typed text (save-game name / high-score
+      initials / cheat prompt). Used to suspend letter-key hotkeys so the letters
+      are typed into the field instead. */
+  isTextInput(): boolean {
+    return this.m?._CKWEB_IsTextInput ? this.m._CKWEB_IsTextInput() !== 0 : false;
   }
 
   /** Force-write options + high scores to persistent storage right now. */

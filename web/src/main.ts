@@ -102,7 +102,9 @@ function wireGlobalGestures(): void {
   window.addEventListener("pointerdown", resumeOnce);
   window.addEventListener("keydown", resumeOnce, { once: true });
   window.addEventListener("keydown", (e) => {
-    if (e.code === "KeyF" && !e.repeat) void display.toggleFullscreen();
+    // Suspend the F=fullscreen hotkey while the engine is collecting typed text
+    // (e.g. a save-game name) so "f" types into the field instead.
+    if (e.code === "KeyF" && !e.repeat && !engine.isTextInput()) void display.toggleFullscreen();
   });
 }
 
