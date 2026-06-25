@@ -11,3 +11,6 @@ _deprecated/
 
 # 注: web/ と engine/ には個別の .gitignore があり、
 #     node_modules / dist / build / public/data は既に除外済み。
+
+# ローカル作業メモ — コミットしない
+*.local.md
