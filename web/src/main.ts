@@ -37,7 +37,7 @@ const engine = new WasmEngine();
 
 // One bridge merges gamepad + on-screen pad into the engine's scancode input.
 const input = new InputBridge((code, down) => engine.setKey(code, down));
-input.onGamepadChange = (count) => { if (count > 0) toast("🎮 ゲームパッド接続"); };
+input.onGamepadChange = (count) => { if (count > 0) toast("🎮 Gamepad connected"); };
 
 buildHud();
 wireGlobalGestures();
@@ -56,12 +56,13 @@ async function main(): Promise<void> {
     await engine.load(String(ep.number));
   } catch (err) {
     console.error(err);
-    toast("エンジンの読み込みに失敗しました");
+    toast("Failed to load engine");
     return;
   }
   engine.start();
+  armUnloadGuard(); // game is live — trap accidental reload / tab-close from here on
   void engine.resumeAudio(); // the episode-selector click is a user gesture
-  toast("Space で開始 / ←→ 移動 / Ctrl ジャンプ / Alt ポゴ / Space 発射");
+  toast("Space: Start · ←→: Move · Ctrl: Jump · Alt: Pogo · Space: Fire");
 
   runLoop();
 }
@@ -81,10 +82,10 @@ function buildHud(): void {
   const hud = document.createElement("div");
   hud.id = "hud";
 
-  const fs = hudButton("⛶", "フルスクリーン (F)", () => void display.toggleFullscreen());
+  const fs = hudButton("⛶", "Fullscreen (F)", () => void display.toggleFullscreen());
   // Aspect ratio moved into the ⚙ display-settings panel (low-frequency setting).
-  const sh = hudButton("⚙", "表示設定", () => toggleShaderPanel());
-  const vp = hudButton("🎮", "バーチャルパッド 切替", () => {});
+  const sh = hudButton("⚙", "Display settings", () => toggleShaderPanel());
+  const vp = hudButton("🎮", "Toggle virtual pad", () => {});
   vp.id = "vp-toggle";
 
   hud.append(fs, sh, vp);
@@ -115,12 +116,12 @@ function buildShaderPanel(): void {
   } satisfies Partial<CSSStyleDeclaration>);
 
   const title = document.createElement("div");
-  title.textContent = "表示設定";
+  title.textContent = "Display";
   Object.assign(title.style, { opacity: "0.7", margin: "2px 4px 8px", letterSpacing: "0.04em" });
   panel.appendChild(title);
 
   const shaderHead = document.createElement("div");
-  shaderHead.textContent = "シェーダ";
+  shaderHead.textContent = "Shader";
   Object.assign(shaderHead.style, { opacity: "0.5", margin: "0 4px 4px", fontSize: "11px" });
   panel.appendChild(shaderHead);
 
@@ -132,7 +133,7 @@ function buildShaderPanel(): void {
   } else {
     buildTextList(panel);
     const note = document.createElement("div");
-    note.textContent = "WebGL2 非対応のため無効";
+    note.textContent = "Disabled — WebGL2 not supported";
     Object.assign(note.style, { opacity: "0.6", margin: "6px 4px 2px" });
     panel.appendChild(note);
   }
@@ -161,7 +162,7 @@ function optionRow(labelText: string): HTMLElement {
 
 /** Segmented control for the aspect mode (4:3 vs pixel-perfect). */
 function buildAspectRow(): HTMLElement {
-  const row = optionRow("アスペクト比");
+  const row = optionRow("Aspect ratio");
 
   const seg = document.createElement("div");
   Object.assign(seg.style, {
@@ -170,7 +171,7 @@ function buildAspectRow(): HTMLElement {
 
   const modes: { mode: AspectMode; label: string }[] = [
     { mode: "4:3", label: "4:3" },
-    { mode: "pixel", label: "等倍" },
+    { mode: "pixel", label: "1:1" },
   ];
   const buttons: HTMLButtonElement[] = [];
   const paint = (): void => {
@@ -187,7 +188,7 @@ function buildAspectRow(): HTMLElement {
     b.type = "button";
     b.dataset.aspect = m.mode; // segment marker; no data-shader => skipped by the shader highlight
     b.textContent = m.label;
-    b.title = m.mode === "4:3" ? "4:3（DOS表示）" : "ピクセル等倍（1:1）";
+    b.title = m.mode === "4:3" ? "4:3 (DOS)" : "Pixel-perfect (1:1)";
     Object.assign(b.style, {
       padding: "3px 14px", cursor: "pointer", font: "inherit", fontSize: "11px",
       border: "none", background: "transparent", color: "inherit",
@@ -198,7 +199,7 @@ function buildAspectRow(): HTMLElement {
       display.setAspectMode(m.mode);
       saveSettings({ aspectMode: m.mode });
       paint();
-      toast(m.mode === "4:3" ? "アスペクト比: 4:3" : "アスペクト比: ピクセル等倍");
+      toast(m.mode === "4:3" ? "Aspect: 4:3" : "Aspect: Pixel-perfect");
     });
     buttons.push(b);
     seg.appendChild(b);
@@ -211,7 +212,7 @@ function buildAspectRow(): HTMLElement {
 
 /** A labelled ON/OFF toggle for integer scaling (uniform pixels / even scanlines). */
 function buildIntegerScaleRow(): HTMLElement {
-  const row = optionRow("整数倍スケール");
+  const row = optionRow("Integer scale");
 
   const pill = document.createElement("button");
   pill.type = "button";
@@ -236,7 +237,7 @@ function buildIntegerScaleRow(): HTMLElement {
     display.setIntegerScale(next);
     saveSettings({ integerScale: next });
     paint();
-    toast(next ? "整数倍スケール: ON" : "整数倍スケール: OFF");
+    toast(next ? "Integer scale: ON" : "Integer scale: OFF");
   });
 
   row.appendChild(pill);
@@ -335,7 +336,7 @@ function selectShader(id: string | null): void {
   saveSettings({ shaderId: applied });
   refreshShaderPanel();
   const preset = SHADER_PRESETS.find((p) => p.id === applied);
-  toast(`表示: ${preset?.label ?? "オリジナル"}`);
+  toast(`Shader: ${preset?.label ?? "Original"}`);
 }
 
 function refreshShaderPanel(): void {
@@ -358,6 +359,20 @@ function wireGlobalGestures(): void {
     // Suspend the F=fullscreen hotkey while the engine is collecting typed text
     // (e.g. a save-game name) so "f" types into the field instead.
     if (e.code === "KeyF" && !e.repeat && !engine.isTextInput()) void display.toggleFullscreen();
+  });
+}
+
+// --- Unload guard -----------------------------------------------------------
+// Once a game is running, intercept reload / tab-close / navigate-away with the
+// browser's native "Leave site?" confirmation so progress isn't lost by mistake.
+// NB: the dialog text is fixed by the browser — a custom message isn't allowed.
+let unloadGuardArmed = false;
+function armUnloadGuard(): void {
+  if (unloadGuardArmed) return;
+  unloadGuardArmed = true;
+  window.addEventListener("beforeunload", (e) => {
+    e.preventDefault();
+    e.returnValue = ""; // Chrome requires returnValue to be set to trigger the prompt
   });
 }
 

@@ -25,13 +25,13 @@ export function chooseEpisode(initialId?: string): Promise<EpisodeDef> {
     overlay.innerHTML = `
       <div class="panel">
         <h1 class="title">COMMANDER KEEN</h1>
-        <p class="subtitle">Galaxy Trilogy — エピソードを選択してください</p>
+        <p class="subtitle">Galaxy Trilogy — Select an episode</p>
         <div class="episode-grid" role="listbox" aria-label="Episode"></div>
         <p class="hint">
-          操作: <kbd>←</kbd><kbd>→</kbd> 選択 / <kbd>Enter</kbd> 決定 ・
-          ゲーム中: <kbd>Ctrl</kbd> ジャンプ <kbd>Alt</kbd> ポゴ <kbd>Space</kbd> 発射 ・
-          <kbd>F</kbd> フルスクリーン<br />
-          データ未配置のエピソードは「デモ(モック)」で起動します。
+          Menu: <kbd>←</kbd><kbd>→</kbd> Select / <kbd>Enter</kbd> Confirm ·
+          In game: <kbd>Ctrl</kbd> Jump <kbd>Alt</kbd> Pogo <kbd>Space</kbd> Fire ·
+          <kbd>F</kbd> Fullscreen<br />
+          Episodes without data start in demo (mock) mode.
         </p>
       </div>`;
     const grid = overlay.querySelector<HTMLElement>(".episode-grid")!;
@@ -44,13 +44,13 @@ export function chooseEpisode(initialId?: string): Promise<EpisodeDef> {
       btn.innerHTML = `
         <div class="num">${ep.number}</div>
         <div class="name">${ep.title}</div>
-        <div class="status">確認中…</div>`;
+        <div class="status">Checking…</div>`;
       btn.addEventListener("click", () => done(ep));
       grid.appendChild(btn);
       // Async data presence badge.
       void hasData(ep).then((ok) => {
         const s = btn.querySelector<HTMLElement>(".status")!;
-        s.textContent = ok ? "● データ検出" : "○ データ未配置 (デモ)";
+        s.textContent = ok ? "● Data found" : "○ No data (demo)";
         s.className = `status ${ok ? "ok" : "missing"}`;
       });
       return btn;

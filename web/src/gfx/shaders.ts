@@ -151,7 +151,7 @@ function parsePragmaParams(glsl: string): ShaderParam[] {
 
 /** The user-facing gallery (HUD settings). 'passthrough' is test-only, omitted. */
 export const SHADER_PRESETS: ShaderPreset[] = [
-  { id: null, label: "オリジナル" }, // no shader (raw output)
+  { id: null, label: "Original" }, // no shader (raw output)
   // Each preset shows its upstream libretro shader name (the repo filename),
   // which is more recognizable / searchable than a feature description.
   { id: "crt-lottes", label: "crt-lottes" },
