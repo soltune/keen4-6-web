@@ -38,6 +38,12 @@ body {
   position: fixed;
   inset: 0;
   display: grid;
+  /* Pin the single grid track to the viewport (minmax min=0). Without this the
+     auto track grows to the canvas's content width, so a once-enlarged canvas
+     props #stage open and the display layer (which measures #stage) can never
+     shrink it again — the screen would stay stuck at its largest size. */
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   place-items: center;
 }
 
@@ -49,6 +55,11 @@ body {
   display: grid;
   place-items: center;
   background: #000;
+  /* Don't let the canvas's intrinsic size expand the stage past the viewport,
+     and clip the momentary overflow before relayout re-fits it. */
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 #screen {
