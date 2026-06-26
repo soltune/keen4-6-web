@@ -828,7 +828,8 @@ void HelpScreens(void)
 			}
 
 			LastScan = 0;
-			while (!LastScan);
+			while (!LastScan)
+				CKWEB_Yield();	/* [web port] yield so the keypress is pumped (ASYNCIFY) */
 
 			switch (LastScan)
 			{

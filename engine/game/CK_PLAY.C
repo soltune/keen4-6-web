@@ -322,7 +322,8 @@ void PicturePause(void)
 // wait for a key press, abort if it's not Enter
 //
 	IN_ClearKeysDown();
-	while (!LastScan);
+	while (!LastScan)
+		CKWEB_Yield();	/* [web port] yield so the keypress is pumped (ASYNCIFY) */
 	if (LastScan != sc_Enter)
 	{
 		IN_ClearKeysDown();

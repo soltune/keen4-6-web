@@ -1043,7 +1043,7 @@ IN_WaitForKey(void)
 	ScanCode	result;
 
 	while (!(result = LastScan))
-		;
+		CKWEB_Yield();	/* [web port] yield so the keypress is pumped (ASYNCIFY) */
 	LastScan = 0;
 	return(result);
 }
@@ -1060,7 +1060,7 @@ IN_WaitForASCII(void)
 	char		result;
 
 	while (!(result = LastASCII))
-		;
+		CKWEB_Yield();	/* [web port] yield so the keypress is pumped (ASYNCIFY) */
 	LastASCII = '\0';
 	return(result);
 }

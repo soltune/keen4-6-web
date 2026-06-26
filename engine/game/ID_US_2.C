@@ -867,6 +867,11 @@ USL_CKSetKey(UserItem far *item,word i)
 		/* [web port] no ISR to guard against (single-threaded). */
 		if (LastScan == sc_LShift)
 			LastScan = sc_None;
+
+		/* [web port] yield every pass: TimeCount only advances inside
+		   CKWEB_Yield, and both the cursor blink and the key wait are
+		   gated on it — without this the loop spins and freezes. */
+		CKWEB_Yield();
 	} while (!(scan = LastScan));
 
 	if (scan != sc_Escape)
@@ -969,8 +974,11 @@ USL_CJGet(word joy,word button,word x,word y,word *xaxis,word *yaxis)
 	longword        time;
 
 	while (IN_GetJoyButtonsDB(joy))
+	{
+		CKWEB_Yield();	/* [web port] yield so input/joystick state is pumped */
 		if (LastScan == sc_Escape)
 			return(false);
+	}
 
 	on = false;
 	time = 0;
@@ -984,6 +992,10 @@ USL_CJGet(word joy,word button,word x,word y,word *xaxis,word *yaxis)
 			VW_UpdateScreen();
 		}
 
+		/* [web port] yield every pass: TimeCount only advances inside
+		   CKWEB_Yield, which the blink above is gated on, and this also
+		   pumps the Esc key / joystick state. */
+		CKWEB_Yield();
 		if (LastScan == sc_Escape)
 			return(false);
 	}
