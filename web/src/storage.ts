@@ -82,6 +82,10 @@ const SETTINGS_KEY = "keen4-6-web:settings";
 export interface Settings {
   lastEpisode?: string;
   aspectMode?: "4:3" | "pixel";
+  /** Selected display shader preset id, or null/undefined for the plain path. */
+  shaderId?: string | null;
+  /** Snap the displayed image to an integer multiple of 320x200 (default off). */
+  integerScale?: boolean;
   [k: string]: unknown;
 }
 

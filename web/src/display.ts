@@ -1,40 +1,37 @@
 /* ===========================================================================
    Display layer.
 
-   Responsibilities (goal requirements #3, #4):
-     - Blit the engine's indexed framebuffer to a 320x200 canvas.
-     - Scale to fill the window while preserving aspect ratio (letterbox).
-     - Fullscreen toggle.
+   Owns the on-screen <canvas> rectangle — aspect-correct letterbox, fullscreen —
+   and delegates pixel presentation to a FrameRenderer:
+     - Canvas2DRenderer (default): putImageData, CSS-upscaled. No shader.
+     - WebGL2Renderer:             texture + fragment shader (CRT / scanline / …).
 
-   The canvas keeps its native 320x200 backing store and is upscaled by the
-   browser with `image-rendering: pixelated`, so we never pay for per-pixel
-   scaling in JS and stay crisp at any size.
+   Switching renderer kind swaps the underlying <canvas> element, since a canvas
+   can only ever vend one context type. Selecting a shader falls back to 2D when
+   WebGL2 is unavailable or a program fails to build, so the game always renders.
    =========================================================================== */
 
 import { SCREEN_W, SCREEN_H, DISPLAY_ASPECT, type VideoFrame } from "./engine/types";
+import type { FrameRenderer, RendererKind } from "./gfx/types";
+import { Canvas2DRenderer } from "./gfx/canvas2d";
+import { WebGL2Renderer, isWebGL2Available } from "./gfx/webgl2";
+import { listShaders } from "./gfx/shaders";
 
 export type AspectMode = "4:3" | "pixel";
 
 export class Display {
   private canvas: HTMLCanvasElement;
-  private ctx: CanvasRenderingContext2D;
-  private image: ImageData;
-  private rgba: Uint32Array; // view over image.data for fast palette writes
-  private paletteLut = new Uint32Array(256); // index -> packed RGBA (little-endian)
-  private aspectMode: AspectMode = "4:3";
   private container: HTMLElement;
+  private currentAspect: AspectMode = "4:3";
+  private integerScale = false;
+  private renderer: FrameRenderer;
+  private shaderId: string | null = null;
+  private lastRGBA: Uint8Array | null = null; // most recent frame (a volatile wasm-heap view)
 
   constructor(canvas: HTMLCanvasElement, container: HTMLElement) {
     this.canvas = canvas;
     this.container = container;
-    canvas.width = SCREEN_W;
-    canvas.height = SCREEN_H;
-    const ctx = canvas.getContext("2d", { alpha: false });
-    if (!ctx) throw new Error("2D canvas context unavailable");
-    this.ctx = ctx;
-    this.ctx.imageSmoothingEnabled = false;
-    this.image = ctx.createImageData(SCREEN_W, SCREEN_H);
-    this.rgba = new Uint32Array(this.image.data.buffer);
+    this.renderer = new Canvas2DRenderer(canvas);
 
     window.addEventListener("resize", this.relayout);
     window.addEventListener("orientationchange", this.relayout);
@@ -43,59 +40,142 @@ export class Display {
   }
 
   setAspectMode(mode: AspectMode): void {
-    this.aspectMode = mode;
+    this.currentAspect = mode;
     this.relayout();
+  }
+
+  /** The current aspect mode (for the settings panel's segmented control). */
+  get aspectMode(): AspectMode {
+    return this.currentAspect;
+  }
+
+  /** Whether integer scaling is currently enabled. */
+  get integerScaleEnabled(): boolean {
+    return this.integerScale;
+  }
+
+  /**
+   * Snap the displayed image to an integer multiple of the source grid. Trades
+   * some screen fill (black borders) for uniform pixels / even scanlines, which
+   * matters most for CRT & scanline shaders.
+   */
+  setIntegerScale(on: boolean): void {
+    this.integerScale = on;
+    this.relayout();
+  }
+
+  // --- Shader selection ----------------------------------------------------
+
+  /** Whether a hardware shader path is available on this device. */
+  get shaderSupported(): boolean {
+    return isWebGL2Available();
+  }
+
+  /** Currently active shader preset id, or null for the plain 2D path. */
+  get shader(): string | null {
+    return this.shaderId;
+  }
+
+  /** Ids of all selectable shader presets (for the settings gallery). */
+  availableShaders(): string[] {
+    return listShaders();
+  }
+
+  /**
+   * Select a shader preset (null = none / plain 2D). Switching to/from a shader
+   * swaps the renderer (and the <canvas>). Falls back to 2D if WebGL2 is
+   * unavailable or the program fails to build.
+   */
+  setShader(id: string | null): void {
+    if (id === this.shaderId) return;
+    try {
+      const wantGL = id !== null;
+      if (wantGL && this.renderer.kind !== "webgl2") this.switchRenderer("webgl2");
+      else if (!wantGL && this.renderer.kind !== "canvas2d") this.switchRenderer("canvas2d");
+
+      if (this.renderer.kind === "webgl2") {
+        (this.renderer as WebGL2Renderer).setShader(id!);
+      }
+      this.shaderId = this.renderer.kind === "webgl2" ? id : null;
+    } catch (err) {
+      console.warn("Shader select failed; falling back to 2D:", err);
+      if (this.renderer.kind !== "canvas2d") this.switchRenderer("canvas2d");
+      this.shaderId = null;
+    }
+    this.relayout();
+  }
+
+  /** Replace the renderer (and its <canvas>) with one of the given kind. */
+  private switchRenderer(kind: RendererKind): void {
+    const fresh = document.createElement("canvas");
+    fresh.id = this.canvas.id;
+    fresh.className = this.canvas.className;
+    // Construct first: if it throws (e.g. no WebGL2), current state is intact.
+    const next = kind === "webgl2"
+      ? new WebGL2Renderer(fresh)
+      : new Canvas2DRenderer(fresh);
+    this.canvas.replaceWith(fresh);
+    this.renderer.dispose();
+    this.canvas = fresh;
+    this.renderer = next;
+  }
+
+  // --- Frame presentation (delegated) --------------------------------------
+
+  /** Blit a pre-resolved RGBA frame (the wasm engine's framebuffer). */
+  drawRGBA(rgba: Uint8Array): void {
+    this.lastRGBA = rgba;
+    this.renderer.drawRGBA(rgba);
+  }
+
+  /**
+   * A *copy* of the most recent RGBA frame (SCREEN_W*SCREEN_H*4), or null if
+   * none yet. The engine's frame is a view over the wasm heap valid only until
+   * the next call, so we slice it; callers (e.g. the shader-gallery thumbnails)
+   * own the returned buffer.
+   */
+  snapshotFrame(): Uint8Array | null {
+    return this.lastRGBA ? this.lastRGBA.slice() : null;
+  }
+
+  /** Blit one indexed frame + palette. */
+  draw(frame: VideoFrame): void {
+    this.renderer.drawIndexed(frame);
+  }
+
+  clear(): void {
+    this.renderer.clear();
   }
 
   /** Compute the largest aspect-correct rectangle that fits the window. */
   private relayout = (): void => {
     const cw = this.container.clientWidth || window.innerWidth;
     const ch = this.container.clientHeight || window.innerHeight;
-    const target = this.aspectMode === "4:3" ? DISPLAY_ASPECT : SCREEN_W / SCREEN_H;
+    const target = this.currentAspect === "4:3" ? DISPLAY_ASPECT : SCREEN_W / SCREEN_H;
     let w = cw;
     let h = Math.round(cw / target);
     if (h > ch) {
       h = ch;
       w = Math.round(ch * target);
     }
+    // Integer scaling: snap the height down to a whole multiple of the source
+    // (200) so each source line maps to a constant number of output rows (even
+    // scanlines); width follows the chosen aspect. In pixel mode (target=1.6)
+    // this also makes the width an exact 320*k. Skipped when the viewport is too
+    // short for even 1x (k<1), where we keep the plain letterbox fit.
+    if (this.integerScale) {
+      const k = Math.floor(h / SCREEN_H);
+      if (k >= 1) {
+        h = SCREEN_H * k;
+        w = Math.round(h * target);
+      }
+    }
     this.canvas.style.width = `${w}px`;
     this.canvas.style.height = `${h}px`;
+    // Cap dpr so the shader's drawing buffer stays sane on hi-dpi mobile.
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    this.renderer.resize(w, h, dpr);
   };
-
-  private updatePalette(palette: Uint8Array): void {
-    const n = (palette.length / 3) | 0;
-    for (let i = 0; i < n; i++) {
-      const r = palette[i * 3];
-      const g = palette[i * 3 + 1];
-      const b = palette[i * 3 + 2];
-      // ImageData is RGBA little-endian => 0xAABBGGRR
-      this.paletteLut[i] = (0xff << 24) | (b << 16) | (g << 8) | r;
-    }
-  }
-
-  /** Blit one indexed frame. */
-  draw(frame: VideoFrame): void {
-    this.updatePalette(frame.palette);
-    const lut = this.paletteLut;
-    const src = frame.indices;
-    const dst = this.rgba;
-    const count = SCREEN_W * SCREEN_H;
-    for (let i = 0; i < count; i++) dst[i] = lut[src[i]];
-    this.ctx.putImageData(this.image, 0, 0);
-  }
-
-  /** Blit a pre-resolved RGBA frame (e.g. the wasm engine's framebuffer).
-      `rgba` must be SCREEN_W*SCREEN_H*4 bytes. */
-  drawRGBA(rgba: Uint8Array): void {
-    this.image.data.set(rgba);
-    this.ctx.putImageData(this.image, 0, 0);
-  }
-
-  /** Convenience: clear to a solid palette index 0 colour. */
-  clear(): void {
-    this.ctx.fillStyle = "#000";
-    this.ctx.fillRect(0, 0, SCREEN_W, SCREEN_H);
-  }
 
   // --- Fullscreen ----------------------------------------------------------
   get isFullscreen(): boolean {
