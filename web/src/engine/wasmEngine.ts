@@ -231,11 +231,15 @@ export class WasmEngine {
   }
 
   /** Let genuine browser/OS shortcuts through instead of feeding them to the
-      game: Cmd+… (mac), Ctrl+<key> combos (reload/close/devtools — but NOT
-      Ctrl on its own, which is the jump button), and the reserved F5/F11/F12. */
+      game: Cmd+… (mac) and the reserved F5/F11/F12 (reload/fullscreen/devtools).
+      We deliberately do NOT treat Ctrl+<key> as a shortcut: Ctrl is the jump
+      button, so while it is held every keydown reports ctrlKey===true — keying
+      off that swallowed the arrows/Space pressed during a jump, breaking
+      simultaneous jump+move/jump+fire on the keyboard. Game input wins; F5 still
+      reloads. (Browser-reserved chords like Ctrl+W are handled by the browser
+      before the page anyway, so this doesn't trap the user.) */
   private isBrowserShortcut(e: KeyboardEvent): boolean {
     if (e.metaKey) return true;
-    if (e.ctrlKey && e.code !== "ControlLeft" && e.code !== "ControlRight") return true;
     return e.code === "F5" || e.code === "F11" || e.code === "F12";
   }
 
