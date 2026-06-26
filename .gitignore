@@ -6,6 +6,12 @@ dos/
 keen_complete_pack/
 web/public/engine/*.data
 
+# GPL 対象外のサードパーティ製 DOS ツールバイナリ — コミット禁止（各自で用意）
+#   LZEXE: フリーウェア（F. Bellard）。抽出は tools/extract.mjs の JS 版 UNLZEXE を使用。
+#   MAKEOBJ: id Software のツール。ソース KEEN4-6/static/makeobj.c から各自ビルド可。
+LZEXE.EXE
+KEEN4-6/static/MAKEOBJ.EXE
+
 # 削除予定の隔離ディレクトリ
 _deprecated/
 
