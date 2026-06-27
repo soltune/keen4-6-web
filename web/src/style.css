@@ -37,6 +37,10 @@ body {
 #app {
   position: fixed;
   inset: 0;
+  /* touch-action does NOT inherit, so html/body's `touch-action: none` never
+     reaches descendants. Re-assert it on the game regions (and on .vp-key
+     below) or iOS Safari treats a fast double-tap on a button as a zoom. */
+  touch-action: none;
   display: grid;
   /* Pin the single grid track to the viewport (minmax min=0). Without this the
      auto track grows to the canvas's content width, so a once-enlarged canvas
@@ -52,6 +56,7 @@ body {
   position: relative;
   width: 100%;
   height: 100%;
+  touch-action: none;
   display: grid;
   place-items: center;
   background: #000;
@@ -67,6 +72,7 @@ body {
   image-rendering: pixelated;
   image-rendering: crisp-edges;
   background: #000;
+  touch-action: none;
   display: block;
 }
 
@@ -279,6 +285,7 @@ body {
   inset: 0;
   z-index: 10;
   pointer-events: none;
+  touch-action: none;
 }
 #virtualpad .vp-zone {
   position: absolute;
@@ -312,6 +319,9 @@ body {
 .vp-key {
   -webkit-user-select: none;
   user-select: none;
+  /* Suppress the double-tap-to-zoom gesture on rapid button taps (iOS Safari).
+     touch-action must be set on the button itself — it does not inherit. */
+  touch-action: none;
   display: grid;
   place-items: center;
   font-size: 13px;

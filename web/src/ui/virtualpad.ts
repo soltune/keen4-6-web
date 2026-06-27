@@ -107,6 +107,14 @@ export class VirtualPad {
     el.addEventListener("pointercancel", release);
     el.addEventListener("lostpointercapture", () => press(false));
     el.addEventListener("contextmenu", (e) => e.preventDefault());
+
+    // Fallback for iOS Safari: CSS `touch-action: none` should stop double-tap
+    // zoom, but older WebKit still zooms on rapid taps. Cancelling the touch
+    // default action (non-passive) suppresses the gesture without affecting the
+    // pointer events that drive press()/release().
+    const swallow = (e: TouchEvent) => e.preventDefault();
+    el.addEventListener("touchstart", swallow, { passive: false });
+    el.addEventListener("touchend", swallow, { passive: false });
     return el;
   }
 }
