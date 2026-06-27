@@ -1,22 +1,27 @@
 # macOS
 .DS_Store
 
-# 著作権のあるゲームデータ — コミット禁止（利用者が各自所有のものを用意する）
-dos/
+# 著作権のあるゲームデータ — コミット禁止（利用者が各自所有のものを用意する）。
+# ただし dos/ck4|ck5|ck6 の「ひな型」ディレクトリと README だけは追跡する
+# （データファイル本体や他のサブディレクトリ _ck5 等は引き続き除外）。
+dos/*
+!dos/ck4/
+!dos/ck5/
+!dos/ck6/
+dos/ck4/*
+dos/ck5/*
+dos/ck6/*
+!dos/ck4/README.md
+!dos/ck5/README.md
+!dos/ck6/README.md
 keen_complete_pack/
 web/public/engine/*.data
 
-# GPL 対象外のサードパーティ製 DOS ツールバイナリ — コミット禁止（各自で用意）
+# GPL 対象外のサードパーティ製 DOS ツールバイナリ — コミット禁止
 #   LZEXE: フリーウェア（F. Bellard）。抽出は tools/extract.mjs の JS 版 UNLZEXE を使用。
 #   MAKEOBJ: id Software のツール。ソース KEEN4-6/static/makeobj.c から各自ビルド可。
 LZEXE.EXE
 KEEN4-6/static/MAKEOBJ.EXE
-
-# 削除予定の隔離ディレクトリ
-_deprecated/
-
-# 注: web/ と engine/ には個別の .gitignore があり、
-#     node_modules / dist / build / public/data は既に除外済み。
 
 # ローカル作業メモ — コミットしない
 *.local.md

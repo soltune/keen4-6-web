@@ -6,6 +6,7 @@
    Usage: node web/test/level-test.mjs [4|5|6]   env: CK_T=secs */
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { loadDataIntoFS } from "./_loadData.mjs";
 
 const ep = process.argv[2] || "4";
 const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), ".."); // web/ root (this script lives in web/test/)
@@ -17,6 +18,8 @@ const m = await factory({
   print: (t) => console.log("[out]", t),
   printErr: (t) => console.log("[err]", t),
 });
+
+loadDataIntoFS(m, ep, dir);
 
 let mainErr = null;
 Promise.resolve(m._main()).then(() => {}, (e) => { mainErr = e; });

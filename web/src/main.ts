@@ -60,7 +60,7 @@ async function main(): Promise<void> {
   document.getElementById("vp-toggle")?.addEventListener("click", () => vpad.toggle());
 
   try {
-    await engine.load(String(ep.number));
+    await engine.load(ep);
   } catch (err) {
     console.error(err);
     toast("Failed to load engine");

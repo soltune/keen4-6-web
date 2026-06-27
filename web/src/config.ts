@@ -26,7 +26,7 @@ function galaxyFiles(ext: string): string[] {
     `EGAHEAD.${ext}`,
     `EGADICT.${ext}`,
     `MAPHEAD.${ext}`,
-    `AUDIOHED.${ext}`,
+    `AUDIOHEAD.${ext}`,
     `AUDIODICT.${ext}`,
   ];
 }

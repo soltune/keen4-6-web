@@ -6,6 +6,7 @@
    Usage: node web/test/rewind-test.mjs [4|5|6] [level] */
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { loadDataIntoFS } from "./_loadData.mjs";
 
 const ep = process.argv[2] || "4";
 const level = +(process.argv[3] || 1);
@@ -18,6 +19,8 @@ const m = await factory({
   print: () => {},
   printErr: (t) => { if (/error|abort|assert/i.test(t)) console.log("[err]", t); },
 });
+
+loadDataIntoFS(m, ep, dir);
 
 let mainErr = null;
 Promise.resolve(m._main()).then(() => {}, (e) => { mainErr = e; });

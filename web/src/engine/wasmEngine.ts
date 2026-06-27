@@ -19,6 +19,7 @@
    =========================================================================== */
 
 import { KeymapResolver, normalizeCode, DEFAULT_KEYMAP, type Keymap } from "../keymap";
+import { DATA_BASE, type EpisodeDef } from "../config";
 
 export interface KeenWasm {
   _CKWEB_Boot(): void;
@@ -40,13 +41,14 @@ export interface KeenWasm {
   FS: EmscriptenFS;
 }
 
-/** The slice of Emscripten's FS API we use for persistent saves (IDBFS). */
+/** The slice of Emscripten's FS API we use for game data + persistent saves. */
 interface EmscriptenFS {
   mkdir(path: string): void;
   mount(type: unknown, opts: object, mountpoint: string): void;
   syncfs(populate: boolean, cb: (err: unknown) => void): void;
   analyzePath(path: string): { exists: boolean };
   readdir(path: string): string[];
+  writeFile(path: string, data: Uint8Array): void;
   filesystems: { IDBFS: unknown };
 }
 
@@ -111,8 +113,8 @@ export class WasmEngine {
   private h = 200;
 
   /** Load and instantiate the episode module (does not start the game yet). */
-  async load(ep: string, baseUrl = "engine/"): Promise<void> {
-    const url = new URL(`${baseUrl}keen${ep}.js`, document.baseURI).href;
+  async load(ep: EpisodeDef, baseUrl = "engine/"): Promise<void> {
+    const url = new URL(`${baseUrl}keen${ep.number}.js`, document.baseURI).href;
     const mod = (await import(/* @vite-ignore */ url)) as { default: KeenFactory };
     this.m = await mod.default({
       locateFile: (p: string) => new URL(`${baseUrl}${p}`, document.baseURI).href,
@@ -121,9 +123,37 @@ export class WasmEngine {
         if (/error|abort|assert|out of bounds/i.test(s)) console.warn("[keen]", s);
       },
     });
+    await this.loadData(ep);
     await this.setupPersistence();
     this.w = this.m._VW_ScreenWidth();
     this.h = this.m._VW_ScreenHeight();
+  }
+
+  /** Populate MEMFS with the episode's data *before* the engine boots.
+
+     The engine is linked data-independent (no Emscripten --preload-file), so the
+     shell fetches the extracted assets from public/data/<id>/ and writes them to
+     MEMFS root here. Names are stored UPPERCASE because the engine opens
+     EGADICT.CK4 / GAMEMAPS.CK4 / ... and MEMFS is case-sensitive. A self-contained
+     (KEEN_PRELOAD=1) build already has the files baked in, so any already present
+     is left untouched. */
+  private async loadData(ep: EpisodeDef): Promise<void> {
+    const m = this.m;
+    if (!m) return;
+    for (const name of ep.dataFiles) {
+      const dest = "/" + name.toUpperCase();
+      if (m.FS.analyzePath(dest).exists) continue; // preloaded build
+      const url = new URL(`${DATA_BASE}/${ep.id}/${name}`, document.baseURI).href;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`game data fetch failed: ${name} (HTTP ${res.status})`);
+      // A missing file is often answered with the SPA fallback index.html (HTTP
+      // 200, text/html). Refuse it instead of writing the HTML page into MEMFS as
+      // if it were game data (which would boot the engine into a black screen).
+      if ((res.headers.get("content-type") || "").includes("text/html")) {
+        throw new Error(`game data missing for ${ep.id}: ${name} (server returned the HTML fallback, not the file)`);
+      }
+      m.FS.writeFile(dest, new Uint8Array(await res.arrayBuffer()));
+    }
   }
 
   /** Mount IndexedDB-backed storage at /save and load any persisted CONFIG /

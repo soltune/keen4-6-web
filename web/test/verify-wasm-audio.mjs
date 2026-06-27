@@ -7,6 +7,7 @@
    Run: node web/test/verify-wasm-audio.mjs [4|5|6]   (module must be linked). */
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { loadDataIntoFS } from "./_loadData.mjs";
 
 const ep = process.argv[2] || "4";
 const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), ".."); // web/ root (this script lives in web/test/)
@@ -16,6 +17,7 @@ const factory = (await import(path.join(engineDir, `keen${ep}.js`))).default;
 const m = await factory({ locateFile: (p) => path.join(engineDir, p), print: () => {}, printErr: () => {} });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+loadDataIntoFS(m, ep, dir);
 m._CKWEB_Boot();
 Promise.resolve(m._main()).catch((e) => console.log("main rejected:", e?.message));
 

@@ -5,6 +5,7 @@
    Usage: node web/test/rewind-gameover-test.mjs [4|6] [level] */
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { loadDataIntoFS } from "./_loadData.mjs";
 
 const ep = process.argv[2] || "4";
 const level = +(process.argv[3] || 1);
@@ -12,6 +13,7 @@ const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const factory = (await import(path.join(dir, `public/engine/keen${ep}.js`))).default;
 const engineDir = path.join(dir, "public/engine");
 const m = await factory({ locateFile: (p) => path.join(engineDir, p), print: () => {}, printErr: (t) => console.log("[err]", t) });
+loadDataIntoFS(m, ep, dir);
 let mainErr = null;
 Promise.resolve(m._main()).then(() => {}, (e) => { mainErr = e; });
 let abuf = 0; try { abuf = m._malloc ? m._malloc(2048 * 2 * 4) : 0; } catch {}

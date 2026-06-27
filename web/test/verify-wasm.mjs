@@ -3,6 +3,7 @@
    Run: node web/test/verify-wasm.mjs [4|5|6]   (needs the module linked first). */
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { loadDataIntoFS } from "./_loadData.mjs";
 
 const ep = process.argv[2] || "4";
 const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), ".."); // web/ root (this script lives in web/test/)
@@ -19,7 +20,9 @@ const m = await factory({
 });
 console.log(`module keen${ep} instantiated`);
 
-// list the preloaded data files
+loadDataIntoFS(m, ep, dir);
+
+// list the data files loaded into MEMFS
 try {
   const files = m.FS.readdir("/").filter((f) => /CK/i.test(f));
   console.log("MEMFS data:", files.join(", "));

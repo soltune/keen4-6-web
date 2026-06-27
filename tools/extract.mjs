@@ -23,7 +23,7 @@
    Usage: node tools/extract.mjs [ck4|ck5|ck6]
    =========================================================================== */
 
-import { readFileSync, writeFileSync, mkdirSync, readdirSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -301,6 +301,13 @@ function findFile(dir, base, ext) {
 
 function processEpisode(ep) {
   const dosDir = join(DOS, ep.dir);
+  if (!existsSync(dosDir)) {
+    // No data provided for this episode — that's fine (the user may only own
+    // some of CK4/5/6). Skip cleanly instead of throwing ENOENT, and don't
+    // fail the run.
+    console.log(`[${ep.id}] no data in dos/${ep.dir} — skipping this episode`);
+    return true;
+  }
   const exePath =
     findFile(dosDir, `KEEN${ep.ext.slice(2)}E`, "EXE") ||
     findFile(dosDir, `KEEN${ep.ext.slice(2)}`, "EXE") ||

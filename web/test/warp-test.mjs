@@ -6,6 +6,7 @@
    Usage: node web/test/warp-test.mjs [4|5|6] [levels csv]   env: CK_LEVELS=1,5,9 */
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { loadDataIntoFS } from "./_loadData.mjs";
 
 const ep = process.argv[2] || "4";
 const levels = (process.argv[3] || process.env.CK_LEVELS || "1")
@@ -19,6 +20,8 @@ const m = await factory({
   print: () => {},
   printErr: (t) => { if (/error|abort|assert/i.test(t)) console.log("[err]", t); },
 });
+
+loadDataIntoFS(m, ep, dir);
 
 let mainErr = null;
 Promise.resolve(m._main()).then(() => {}, (e) => { mainErr = e; });

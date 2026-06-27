@@ -13,7 +13,11 @@ async function hasData(ep: EpisodeDef): Promise<boolean> {
   try {
     const probe = ep.dataFiles[0];
     const res = await fetch(`${DATA_BASE}/${ep.id}/${probe}`, { method: "HEAD" });
-    return res.ok;
+    if (!res.ok) return false;
+    // A missing file is often answered with the SPA fallback index.html (HTTP 200,
+    // text/html) — by the vite dev server and by some static hosts. Treat an HTML
+    // response as "no data" so an absent episode isn't mistaken for an available one.
+    return !(res.headers.get("content-type") || "").includes("text/html");
   } catch {
     return false;
   }
@@ -32,7 +36,7 @@ export function chooseEpisode(initialId?: string): Promise<EpisodeDef> {
           Menu: <kbd>←</kbd><kbd>→</kbd> Select / <kbd>Enter</kbd> Confirm ·
           In game: <kbd>Ctrl</kbd> Jump <kbd>Alt</kbd> Pogo <kbd>Space</kbd> Fire ·
           <kbd>F</kbd> Fullscreen<br />
-          Episodes without data start in demo (mock) mode.
+          Only episodes with extracted data can be selected — add yours under <code>dos/</code>, run <code>npm&nbsp;run&nbsp;extract</code>, then reload.
         </p>
         <div class="save-tools">
           <button class="save-btn" type="button" data-act="export">⬇ Export saves</button>
@@ -55,11 +59,22 @@ export function chooseEpisode(initialId?: string): Promise<EpisodeDef> {
         <div class="status">Checking…</div>`;
       btn.addEventListener("click", () => done(ep));
       grid.appendChild(btn);
-      // Async data presence badge.
+      // Async data presence badge. Episodes without data are disabled (greyed
+      // out, unclickable, skipped by keyboard nav) — there is no demo mode.
       void hasData(ep).then((ok) => {
         const s = btn.querySelector<HTMLElement>(".status")!;
-        s.textContent = ok ? "● Data found" : "○ No data (demo)";
+        s.textContent = ok ? "● Data found" : "○ No data";
         s.className = `status ${ok ? "ok" : "missing"}`;
+        btn.disabled = !ok;
+        if (!ok) {
+          btn.setAttribute("aria-disabled", "true");
+          // If focus is sitting on the episode we just disabled, move it to an
+          // available one (the initial focus is set before these checks resolve).
+          if (buttons[focus] === btn) {
+            const next = buttons.findIndex((b) => !b.disabled);
+            if (next >= 0) { focus = next; updateFocus(); }
+          }
+        }
       });
       return btn;
     });
@@ -67,25 +82,37 @@ export function chooseEpisode(initialId?: string): Promise<EpisodeDef> {
     let focus = Math.max(0, EPISODES.findIndex((e) => e.id === initialId));
     const updateFocus = () => buttons[focus]?.focus();
 
+    // Next selectable (non-disabled) button index in the given direction; stays
+    // put if nothing is selectable (all episodes lack data).
+    const step = (from: number, dir: number): number => {
+      for (let n = 1; n <= buttons.length; n++) {
+        const i = ((from + dir * n) % buttons.length + buttons.length) % buttons.length;
+        if (!buttons[i].disabled) return i;
+      }
+      return from;
+    };
+
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "ArrowRight" || e.key === "ArrowDown") {
-        focus = (focus + 1) % buttons.length;
+        focus = step(focus, 1);
         updateFocus();
         e.preventDefault();
       } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
-        focus = (focus - 1 + buttons.length) % buttons.length;
+        focus = step(focus, -1);
         updateFocus();
         e.preventDefault();
       } else if (e.key === "Enter" || e.key === " ") {
         // Let a focused Export/Import button handle its own activation.
         if (document.activeElement instanceof HTMLElement &&
             document.activeElement.classList.contains("save-btn")) return;
-        done(EPISODES[focus]);
+        if (!buttons[focus]?.disabled) done(EPISODES[focus]);
         e.preventDefault();
       }
     };
 
     function done(ep: EpisodeDef) {
+      // Ignore activation of a data-less (disabled) episode.
+      if (buttons[EPISODES.indexOf(ep)]?.disabled) return;
       window.removeEventListener("keydown", onKey);
       overlay.remove();
       resolve(ep);
