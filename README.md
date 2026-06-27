@@ -5,9 +5,28 @@ running in the browser.
 
 Supported episodes: CK4 (Secret of the Oracle) / CK5 (The Armageddon Machine) / CK6 (Aliens Ate My Babysitter)
 
-> **About the data**: Game data (graphics, maps, audio) is **not** bundled. Use the files from a
-> copy of the game you legally own (**v1.4**-era data is recommended, as it matches the chunk
-> layout the reconstructed engine expects).
+### ▶ Play the EP4 demo in your browser — no download needed
+
+**https://soltune.github.io/keen4-6-web/**
+
+Commander Keen 4 is freely-redistributable Apogee shareware, so the hosted demo runs with no
+setup. CK5 and CK6 are not shareware — to play them, clone the repo and supply your own
+legally-owned data (see below).
+
+## Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/keen4.jpg" width="32%" alt="Commander Keen 4 — Secret of the Oracle" />
+  <img src="docs/screenshots/keen5.jpg" width="32%" alt="Commander Keen 5 — The Armageddon Machine" />
+  <img src="docs/screenshots/keen6.jpg" width="32%" alt="Commander Keen 6 — Aliens Ate My Babysitter" />
+</p>
+<p align="center"><sub>CK4 · Secret of the Oracle&nbsp;&nbsp;|&nbsp;&nbsp;CK5 · The Armageddon Machine&nbsp;&nbsp;|&nbsp;&nbsp;CK6 · Aliens Ate My Babysitter</sub></p>
+
+> **About the data**: **Commander Keen 4 is freely-redistributable Apogee shareware**, so its
+> data is bundled and the [online demo](https://soltune.github.io/keen4-6-web/) is playable with
+> no download. **CK5/CK6 are not shareware** — supply data from a copy you legally own (**v1.4**-era
+> data is recommended, as it matches the chunk layout the reconstructed engine expects). See
+> [`DATA_NOTICE.md`](DATA_NOTICE.md) for details.
 
 ---
 

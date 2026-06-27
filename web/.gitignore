@@ -2,6 +2,9 @@ node_modules/
 dist/
 *.local
 .DS_Store
-# Extracted game data is derived from the user's own copyrighted files and must
-# not be committed.
-public/data/
+# Extracted game data is derived from copyrighted game files. Do NOT commit the
+# data for the registered episodes (CK5/CK6). The CK4 ("Secret of the Oracle")
+# data IS committed on purpose: Keen 4 is freely-redistributable Apogee shareware,
+# bundled so the GitHub Pages demo is playable out of the box. See DATA_NOTICE.md.
+public/data/*
+!public/data/ck4/
