@@ -309,6 +309,17 @@ boolean LoadTheGame(Sint16 handle)
 		{
 			new->temp2 = new->temp3 = 0;	//clear sprite ptrs
 		}
+		else if (new->obclass == dopefishobj && new->state == &s_dopeattack)
+		{
+			// [web port] temp4 held a raw pointer to the object being eaten.
+			// After save/load the objarray slots are renumbered, so that pointer
+			// is stale -- T_DopeHunt would chase/eat (or RemoveObj) the wrong
+			// actor. Abort the lunge and return the Dopefish to normal swimming.
+			new->temp1 = 0;
+			new->temp4 = 0;
+			new->needtoclip = cl_fullclip;
+			ChangeState(new, &s_dopefish1);
+		}
 #elif defined KEEN5
 		else if (new->obclass == mineobj)
 		{

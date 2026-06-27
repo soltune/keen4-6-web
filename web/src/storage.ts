@@ -86,6 +86,8 @@ export interface Settings {
   shaderId?: string | null;
   /** Snap the displayed image to an integer multiple of 320x200 (default off). */
   integerScale?: boolean;
+  /** Per-action keyboard bindings (DOM KeyboardEvent.code lists). See keymap.ts. */
+  keymap?: Record<string, string[]>;
   [k: string]: unknown;
 }
 

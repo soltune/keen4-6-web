@@ -11,8 +11,10 @@
 import { Display, type AspectMode } from "./display";
 import { VirtualPad } from "./ui/virtualpad";
 import { chooseEpisode } from "./ui/selector";
+import { KeybindPanel } from "./ui/keybind";
 import { WasmEngine } from "./engine/wasmEngine";
 import { InputBridge } from "./input";
+import { sanitizeKeymap, type Keymap } from "./keymap";
 import { loadSettings, saveSettings } from "./storage";
 import { SHADER_PRESETS } from "./gfx/shaders";
 import { ShaderThumbnailer, type ThumbItem } from "./gfx/thumbnails";
@@ -25,6 +27,7 @@ let shaderPanel: HTMLDivElement | null = null; // ⚙ gallery; built in buildHud
 let shaderTiles: ThumbItem[] = []; // preset id -> its thumbnail <canvas> (WebGL2 path)
 let thumbnailer: ShaderThumbnailer | null = null; // lazy; null until first panel open
 let thumbnailerDead = false; // set if construction failed, so we stop retrying
+let keybindPanel: KeybindPanel | null = null; // ⌨ key-bindings panel; built in buildHud()
 
 const settings = loadSettings();
 const display = new Display(screen, stage);
@@ -34,6 +37,10 @@ display.setIntegerScale(settings.integerScale ?? false);
 (window as unknown as { __keenDisplay: Display }).__keenDisplay = display; // for verification
 const engine = new WasmEngine();
 (window as unknown as { __keenEngine: WasmEngine }).__keenEngine = engine; // for verification
+
+// Keyboard bindings (shared across all episodes), applied before the engine boots.
+let keymap: Keymap = sanitizeKeymap(settings.keymap);
+engine.setKeymap(keymap);
 
 // One bridge merges gamepad + on-screen pad into the engine's scancode input.
 const input = new InputBridge((code, down) => engine.setKey(code, down));
@@ -85,12 +92,29 @@ function buildHud(): void {
   const fs = hudButton("⛶", "Fullscreen (F)", () => void display.toggleFullscreen());
   // Aspect ratio moved into the ⚙ display-settings panel (low-frequency setting).
   const sh = hudButton("⚙", "Display settings", () => toggleShaderPanel());
+  const kb = hudButton("⌨", "Controls (key bindings)", () => keybindPanel?.toggle());
   const vp = hudButton("🎮", "Toggle virtual pad", () => {});
   vp.id = "vp-toggle";
 
-  hud.append(fs, sh, vp);
+  hud.append(fs, sh, kb, vp);
   document.body.appendChild(hud);
   buildShaderPanel();
+  buildKeybindPanel();
+}
+
+/** Build the ⌨ key-bindings panel; applies live to the engine + persists. */
+function buildKeybindPanel(): void {
+  keybindPanel = new KeybindPanel({
+    getMap: () => keymap,
+    setMap: (m) => {
+      keymap = m;
+      engine.setKeymap(m);
+      saveSettings({ keymap: m });
+    },
+    beginCapture: (cb) => engine.beginKeyCapture(cb),
+    toast,
+  });
+  document.body.appendChild(keybindPanel.el);
 }
 
 function hudButton(label: string, title: string, onClick: () => void): HTMLButtonElement {

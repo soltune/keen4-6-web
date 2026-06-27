@@ -18,6 +18,8 @@
    (public/engine/keen<ep>.js, MODULARIZE + EXPORT_NAME=KeenModule<ep>).
    =========================================================================== */
 
+import { KeymapResolver, normalizeCode, DEFAULT_KEYMAP, type Keymap } from "../keymap";
+
 export interface KeenWasm {
   _CKWEB_Boot(): void;
   _main(): Promise<void> | void;
@@ -100,6 +102,9 @@ export class WasmEngine {
   private audioAnalyser: AnalyserNode | null = null;
   private audioBuf = 0; // wasm heap pointer for the render scratch buffer
   private down = new Set<number>();
+  private heldByCode = new Map<string, number[]>(); // physical code -> scancodes it holds
+  private resolver = new KeymapResolver(DEFAULT_KEYMAP);
+  private capturing = false; // true while grabbing the next key for a rebind
   private keyHandlersAttached = false;
   private started = false;
   private w = 320;
@@ -217,17 +222,74 @@ export class WasmEngine {
   get height(): number { return this.h; }
 
   // --- Input --------------------------------------------------------------
-  /** Inject a key as if it were a DOM event (used by the on-screen pad). */
-  setKey(code: string, isDown: boolean): void {
-    const sc = SCANCODE[code];
-    if (sc === undefined || !this.m) return;
+  /** Replace the active keyboard bindings (physical key -> game action). The
+      gamepad / on-screen pad keep their own mapping and go through setKey(). */
+  setKeymap(map: Keymap): void {
+    this.resolver.setMap(map);
+  }
+
+  /** Grab the next physical key press for a rebind, then call back with the
+      normalized DOM code (null if the player pressed Esc to cancel). Suspends
+      gameplay key handling and releases anything held so no key sticks. The
+      capture listener runs in the capture phase so it pre-empts the gameplay
+      handler; real OS/browser chords (Cmd+…, F5/F11/F12) are ignored. */
+  beginKeyCapture(cb: (code: string | null) => void): void {
+    if (this.capturing) return;
+    this.capturing = true;
+    this.releaseAllDown();
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.metaKey || e.code === "F5" || e.code === "F11" || e.code === "F12") return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      window.removeEventListener("keydown", onKey, true);
+      this.capturing = false;
+      cb(e.code === "Escape" ? null : normalizeCode(e.code));
+    };
+    window.addEventListener("keydown", onKey, { capture: true });
+  }
+
+  /** Push a single scancode to the engine, suppressing duplicates (auto-repeat
+      or two sources holding the same key). */
+  private emit(sc: number, isDown: boolean): void {
+    if (!this.m) return;
     if (isDown) {
-      if (this.down.has(sc)) return; // suppress auto-repeat
+      if (this.down.has(sc)) return;
       this.down.add(sc);
     } else {
       this.down.delete(sc);
     }
     this.m._CKWEB_KeyEvent(sc, isDown ? 1 : 0);
+  }
+
+  /** Release every held scancode (focus loss / before a rebind capture). */
+  private releaseAllDown(): void {
+    if (!this.m) return;
+    for (const sc of this.down) this.m._CKWEB_KeyEvent(sc, 0);
+    this.down.clear();
+    this.heldByCode.clear();
+  }
+
+  /** Inject a literal key by DOM code (used by the on-screen pad / gamepad
+      bridge, which carries its own mapping and bypasses the remap layer). */
+  setKey(code: string, isDown: boolean): void {
+    const sc = SCANCODE[code];
+    if (sc === undefined) return;
+    this.emit(sc, isDown);
+  }
+
+  /** Scancodes a physical keyboard event should fire. While the engine is
+      collecting typed text (save name / cheat prompt) the remap is bypassed so
+      keys type their real letters; otherwise the action layer wins, with the
+      literal table as the fallback for keys it doesn't own. */
+  private scancodesFor(e: KeyboardEvent): number[] {
+    if (this.isTextInput()) {
+      const lit = SCANCODE[e.code];
+      return lit === undefined ? [] : [lit];
+    }
+    const mapped = this.resolver.resolve(e.code);
+    if (mapped !== null) return mapped; // action key, or an owned-but-freed key ([])
+    const lit = SCANCODE[e.code];
+    return lit === undefined ? [] : [lit];
   }
 
   /** Let genuine browser/OS shortcuts through instead of feeding them to the
@@ -247,21 +309,22 @@ export class WasmEngine {
     if (this.keyHandlersAttached) return;
     this.keyHandlersAttached = true;
     window.addEventListener("keydown", (e) => {
-      if (SCANCODE[e.code] === undefined || this.isBrowserShortcut(e)) return;
+      if (this.capturing || this.isBrowserShortcut(e)) return;
+      const scs = this.scancodesFor(e);
+      if (!scs.length) return;
       e.preventDefault();
-      if (e.repeat) return;
-      this.setKey(e.code, true);
+      if (e.repeat) return; // auto-repeat: already held (suppressed in emit anyway)
+      this.heldByCode.set(e.code, scs);
+      for (const sc of scs) this.emit(sc, true);
     }, { passive: false });
     window.addEventListener("keyup", (e) => {
-      if (SCANCODE[e.code] === undefined) return;
-      this.setKey(e.code, false);
+      const scs = this.heldByCode.get(e.code);
+      if (!scs) return; // release exactly what this physical key pressed
+      this.heldByCode.delete(e.code);
+      for (const sc of scs) this.emit(sc, false);
     });
     // Releasing everything on blur avoids "stuck" keys when focus is lost.
-    window.addEventListener("blur", () => {
-      if (!this.m) return;
-      for (const sc of this.down) this.m._CKWEB_KeyEvent(sc, 0);
-      this.down.clear();
-    });
+    window.addEventListener("blur", () => this.releaseAllDown());
   }
 
   // --- Audio --------------------------------------------------------------

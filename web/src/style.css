@@ -178,6 +178,44 @@ body {
   font-size: 11px;
 }
 
+/* --- Save data backup / restore (selector screen) -------------------------- */
+.save-tools {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 18px;
+}
+.save-btn {
+  appearance: none;
+  cursor: pointer;
+  color: var(--ink);
+  background: #0c0f1a;
+  border: 1px solid var(--panel-edge);
+  border-radius: 9px;
+  padding: 8px 14px;
+  font-size: 12px;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.save-btn:hover,
+.save-btn:focus-visible {
+  border-color: var(--accent-2);
+  background: #0f1424;
+  outline: none;
+}
+.save-msg {
+  min-height: 16px;
+  margin: 8px 0 0;
+  text-align: center;
+  font-size: 11px;
+  color: var(--muted);
+}
+.save-msg.ok {
+  color: #6fe39b;
+}
+.save-msg.err {
+  color: var(--danger);
+}
+
 /* --- HUD (top-right controls: fullscreen, etc.) ---------------------------- */
 #hud {
   position: fixed;

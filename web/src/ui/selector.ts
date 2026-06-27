@@ -7,6 +7,7 @@
    =========================================================================== */
 
 import { DATA_BASE, EPISODES, type EpisodeDef } from "../config";
+import { exportSaveBackup, importSaveBackup } from "../saves";
 
 async function hasData(ep: EpisodeDef): Promise<boolean> {
   try {
@@ -33,8 +34,15 @@ export function chooseEpisode(initialId?: string): Promise<EpisodeDef> {
           <kbd>F</kbd> Fullscreen<br />
           Episodes without data start in demo (mock) mode.
         </p>
+        <div class="save-tools">
+          <button class="save-btn" type="button" data-act="export">⬇ Export saves</button>
+          <button class="save-btn" type="button" data-act="import">⬆ Import saves</button>
+          <input class="save-file" type="file" accept="application/json,.json" hidden />
+        </div>
+        <p class="save-msg" role="status" aria-live="polite"></p>
       </div>`;
     const grid = overlay.querySelector<HTMLElement>(".episode-grid")!;
+    wireSaveTools(overlay);
 
     const buttons: HTMLButtonElement[] = EPISODES.map((ep) => {
       const btn = document.createElement("button");
@@ -69,6 +77,9 @@ export function chooseEpisode(initialId?: string): Promise<EpisodeDef> {
         updateFocus();
         e.preventDefault();
       } else if (e.key === "Enter" || e.key === " ") {
+        // Let a focused Export/Import button handle its own activation.
+        if (document.activeElement instanceof HTMLElement &&
+            document.activeElement.classList.contains("save-btn")) return;
         done(EPISODES[focus]);
         e.preventDefault();
       }
@@ -83,5 +94,53 @@ export function chooseEpisode(initialId?: string): Promise<EpisodeDef> {
     window.addEventListener("keydown", onKey);
     document.body.appendChild(overlay);
     requestAnimationFrame(updateFocus);
+  });
+}
+
+/** Wire the Export / Import save-data controls on the selector screen. Works
+    with no engine loaded — see saves.ts for the direct-IndexedDB access. */
+function wireSaveTools(overlay: HTMLElement): void {
+  const exportBtn = overlay.querySelector<HTMLButtonElement>('[data-act="export"]')!;
+  const importBtn = overlay.querySelector<HTMLButtonElement>('[data-act="import"]')!;
+  const fileInput = overlay.querySelector<HTMLInputElement>(".save-file")!;
+  const msgEl = overlay.querySelector<HTMLElement>(".save-msg")!;
+
+  const setMsg = (text: string, kind: "" | "ok" | "err" = "") => {
+    msgEl.textContent = text;
+    msgEl.className = kind ? `save-msg ${kind}` : "save-msg";
+  };
+
+  exportBtn.addEventListener("click", async () => {
+    setMsg("Exporting…");
+    try {
+      const blob = await exportSaveBackup();
+      if (!blob) {
+        setMsg("No saved games to export yet.", "err");
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "keen-saves-backup.json";
+      a.click();
+      URL.revokeObjectURL(url);
+      setMsg("Saves exported to keen-saves-backup.json", "ok");
+    } catch (e) {
+      setMsg(`Export failed: ${(e as Error).message}`, "err");
+    }
+  });
+
+  importBtn.addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", async () => {
+    const file = fileInput.files?.[0];
+    fileInput.value = ""; // let the same file be re-selected later
+    if (!file) return;
+    setMsg("Importing…");
+    try {
+      const r = await importSaveBackup(file);
+      setMsg(`Restored ${r.written} file(s). Pick an episode to use them.`, "ok");
+    } catch (e) {
+      setMsg(`Import failed: ${(e as Error).message}`, "err");
+    }
   });
 }

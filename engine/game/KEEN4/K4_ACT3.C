@@ -626,7 +626,7 @@ void T_DopeHunt(objtype *ob)
 	objtype *target;
 	Sint16 xdist, ydist;
 
-	target = (objtype *)(ob->temp4);
+	target = *(objtype **)&ob->temp4;	// [web port] full 4-byte pointer (see C_Dope)
 	ydist = target->y - TILEGLOBAL - ob->y;
 	if (ob->xdir == 1)
 	{
@@ -798,7 +798,7 @@ void C_Dope(objtype *ob, objtype *hit)
 
 	ob->temp2 = ob->x;
 	ob->temp3 = ob->y;
-	ob->temp4 = (Sint16)hit;
+	*(objtype **)&ob->temp4 = hit;	// [web port] store full pointer; wasm32 ptr is 4 bytes, a (Sint16) cast truncated it -> wild ptr -> OOB crash in T_DopeHunt
 	if (hit->midx < ob->midx)
 	{
 		ob->xdir = -1;
