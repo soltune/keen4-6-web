@@ -21,6 +21,8 @@ import crtGeomGlsl from "./shaders/crt-geom.glsl?raw"; // GPL (cgwg/Themaister/D
 import crtGdvMiniGlsl from "./shaders/crt-gdv-mini.glsl?raw"; // GPL (guest(r)/metallic77) — GDV mini
 import scanlinesSineGlsl from "./shaders/scanlines-sine-abs.glsl?raw"; // Public Domain (RiskyJumps)
 import xbrzGlsl from "./shaders/xbrz-freescale.glsl?raw"; // MIT (Hyllian)
+import lcdDotmatrixGlsl from "./shaders/lcd-dotmatrix.glsl?raw"; // Public Domain — handheld LCD grid, color-preserving
+import gbDmgGreenGlsl from "./shaders/gb-dmg-green.glsl?raw"; // Public Domain — Game Boy DMG 4-tone green + grid
 
 export interface ShaderParam {
   name: string;
@@ -93,6 +95,10 @@ void main() {
   "crt-gdv-mini": { libretro: crtGdvMiniGlsl, filterLinear: true }, // .glslp filter_linear0 = true
   "scanlines-sine-abs": { libretro: scanlinesSineGlsl, filterLinear: false },
   "xbrz-freescale": { libretro: xbrzGlsl, filterLinear: false },
+  // Handheld dot-matrix LCD (single-pass, no extra textures). NEAREST source so
+  // each 320x200 texel reads as one crisp LCD dot.
+  "lcd-dotmatrix": { libretro: lcdDotmatrixGlsl, filterLinear: false },
+  "gb-dmg-green": { libretro: gbDmgGreenGlsl, filterLinear: false },
 };
 
 /**
@@ -160,6 +166,8 @@ export const SHADER_PRESETS: ShaderPreset[] = [
   { id: "crt-gdv-mini", label: "crt-gdv-mini" },
   { id: "scanlines-sine-abs", label: "scanlines-sine-abs" },
   { id: "xbrz-freescale", label: "xbrz-freescale" },
+  { id: "lcd-dotmatrix", label: "lcd-dotmatrix" },
+  { id: "gb-dmg-green", label: "gb-dmg-green" },
 ];
 
 /** Ids of all registered shaders (verification harnesses enumerate these). */
