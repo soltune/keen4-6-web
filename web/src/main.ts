@@ -59,29 +59,91 @@ async function main(): Promise<void> {
   const vpad = new VirtualPad(vpadRoot, input);
   document.getElementById("vp-toggle")?.addEventListener("click", () => vpad.toggle());
 
+  // The selector is gone but the engine/data (~1.4 MB) still has to download +
+  // boot, which is otherwise a blank black screen — show a progress bar until
+  // the first frame is presented.
+  const loading = createLoadingOverlay();
   try {
-    await engine.load(ep);
+    await engine.load(ep, "engine/", (p) => loading.update(p));
   } catch (err) {
     console.error(err);
-    toast("Failed to load engine");
+    loading.fail("Failed to load game data");
     return;
   }
+  loading.starting(); // bytes done; brief gap while the engine boots
   engine.start();
   armUnloadGuard(); // game is live — trap accidental reload / tab-close from here on
   void engine.resumeAudio(); // the episode-selector click is a user gesture
   toast("Space: Start · ←→: Move · Ctrl: Jump · Alt: Pogo · Space: Fire");
 
-  runLoop();
+  runLoop(() => loading.remove()); // drop the overlay once the first frame lands
 }
 
-function runLoop(): void {
+function runLoop(onFirstFrame: () => void): void {
+  let first = true;
   const frame = (): void => {
     input.poll();
     const f = engine.frame();
-    if (f) display.drawRGBA(f);
+    if (f) {
+      display.drawRGBA(f);
+      if (first) { first = false; onFirstFrame(); }
+    }
     requestAnimationFrame(frame);
   };
   requestAnimationFrame(frame);
+}
+
+// --- Loading overlay --------------------------------------------------------
+/** A progress overlay shown between episode-select and the first rendered
+    frame. Reuses the selector's .overlay/.panel look. */
+function createLoadingOverlay(): {
+  update: (p: import("./engine/wasmEngine").LoadProgress) => void;
+  starting: () => void;
+  fail: (msg: string) => void;
+  remove: () => void;
+} {
+  const overlay = document.createElement("div");
+  overlay.className = "overlay";
+  overlay.innerHTML = `
+    <div class="panel loading-panel">
+      <h1 class="title">COMMANDER KEEN</h1>
+      <p class="subtitle loading-label">Loading…</p>
+      <div class="progress" role="progressbar" aria-label="Loading">
+        <div class="progress-fill"></div>
+      </div>
+    </div>`;
+  const label = overlay.querySelector<HTMLElement>(".loading-label")!;
+  const bar = overlay.querySelector<HTMLElement>(".progress")!;
+  const fill = overlay.querySelector<HTMLElement>(".progress-fill")!;
+  document.body.appendChild(overlay);
+
+  const setIndeterminate = (on: boolean): void => { bar.classList.toggle("indeterminate", on); };
+
+  return {
+    update(p) {
+      label.textContent = p.phase === "engine" ? "Loading engine…" : `Loading game data… ${p.label}`;
+      if (p.total > 0) {
+        setIndeterminate(false);
+        const pct = Math.min(100, Math.round((p.loaded / p.total) * 100));
+        fill.style.width = `${pct}%`;
+      } else {
+        setIndeterminate(true); // unknown size — animated sweep instead of a fill
+      }
+    },
+    starting() {
+      setIndeterminate(false);
+      fill.style.width = "100%";
+      label.textContent = "Starting…";
+    },
+    fail(msg) {
+      setIndeterminate(false);
+      label.textContent = msg;
+      label.classList.add("loading-error");
+    },
+    remove() {
+      overlay.remove();
+    },
+  };
 }
 
 // --- HUD --------------------------------------------------------------------

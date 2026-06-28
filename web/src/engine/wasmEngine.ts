@@ -54,9 +54,23 @@ interface EmscriptenFS {
 
 type KeenFactory = (opts: {
   locateFile?: (p: string) => string;
+  wasmBinary?: ArrayBuffer;
   print?: (s: string) => void;
   printErr?: (s: string) => void;
 }) => Promise<KeenWasm>;
+
+/** Progress report for load(): cumulative bytes across the wasm + every data
+    file, so the shell can show one smooth 0→100% bar. `total` is 0 when the
+    host didn't expose Content-Length (the UI then shows an indeterminate bar).
+    `label` names the asset currently downloading. */
+export interface LoadProgress {
+  phase: "engine" | "data";
+  loaded: number;
+  total: number;
+  label: string;
+}
+
+type ProgressCb = (p: LoadProgress) => void;
 
 /* Complete DOM KeyboardEvent.code -> DOS set-1 make code map. The engine's
    ID_IN.C keyboard ISR reads raw scan codes, and the menus / name-entry /
@@ -112,18 +126,64 @@ export class WasmEngine {
   private w = 320;
   private h = 200;
 
-  /** Load and instantiate the episode module (does not start the game yet). */
-  async load(ep: EpisodeDef, baseUrl = "engine/"): Promise<void> {
-    const url = new URL(`${baseUrl}keen${ep.number}.js`, document.baseURI).href;
-    const mod = (await import(/* @vite-ignore */ url)) as { default: KeenFactory };
+  /** Load and instantiate the episode module (does not start the game yet).
+
+     Downloads are driven by the shell, not Emscripten: we fetch the .wasm
+     ourselves (streamed, then handed to the factory via `wasmBinary`) and the
+     data files in loadData(), so a single onProgress callback can report one
+     cumulative byte count across both — see LoadProgress. */
+  async load(ep: EpisodeDef, baseUrl = "engine/", onProgress?: ProgressCb): Promise<void> {
+    const wasmUrl = new URL(`${baseUrl}keen${ep.number}.wasm`, document.baseURI).href;
+    const dataUrls = ep.dataFiles.map((name) => ({
+      name,
+      dest: "/" + name.toUpperCase(),
+      url: new URL(`${DATA_BASE}/${ep.id}/${name}`, document.baseURI).href,
+    }));
+
+    // Import the JS glue first so the loading UI appears immediately, before the
+    // (larger) byte downloads begin.
+    onProgress?.({ phase: "engine", loaded: 0, total: 0, label: "engine" });
+    const jsUrl = new URL(`${baseUrl}keen${ep.number}.js`, document.baseURI).href;
+    const mod = (await import(/* @vite-ignore */ jsUrl)) as { default: KeenFactory };
+
+    // Preflight: sum Content-Length of the wasm + every not-yet-present data
+    // file so the bar is a true 0→100%. Any unknown size leaves total at 0 and
+    // the UI falls back to an indeterminate bar.
+    let loaded = 0;
+    let total = 0;
+    if (onProgress) {
+      const sizes = await Promise.all([
+        contentLength(wasmUrl),
+        ...dataUrls.map((d) => contentLength(d.url)),
+      ]);
+      // Any unknown size (0) makes the grand total unreliable → indeterminate.
+      total = sizes.includes(0) ? 0 : sizes.reduce((a, b) => a + b, 0);
+    }
+    const report = (phase: LoadProgress["phase"], label: string): void =>
+      onProgress?.({ phase, loaded, total, label });
+
+    // Stream the wasm ourselves so we can show its (largest single-chunk)
+    // progress, then hand the bytes to the factory via `wasmBinary` — this
+    // suppresses Emscripten's own (unobservable) fetch of the same file.
+    report("engine", "engine");
+    const wasmBinary = await fetchWithProgress(wasmUrl, (delta) => {
+      loaded += delta;
+      report("engine", "engine");
+    });
+
     this.m = await mod.default({
+      wasmBinary: wasmBinary.buffer as ArrayBuffer,
       locateFile: (p: string) => new URL(`${baseUrl}${p}`, document.baseURI).href,
       print: () => {},
       printErr: (s: string) => {
         if (/error|abort|assert|out of bounds/i.test(s)) console.warn("[keen]", s);
       },
     });
-    await this.loadData(ep);
+
+    await this.loadData(dataUrls, (delta, label) => {
+      loaded += delta;
+      report("data", label);
+    });
     await this.setupPersistence();
     this.w = this.m._VW_ScreenWidth();
     this.h = this.m._VW_ScreenHeight();
@@ -136,23 +196,17 @@ export class WasmEngine {
      MEMFS root here. Names are stored UPPERCASE because the engine opens
      EGADICT.CK4 / GAMEMAPS.CK4 / ... and MEMFS is case-sensitive. A self-contained
      (KEEN_PRELOAD=1) build already has the files baked in, so any already present
-     is left untouched. */
-  private async loadData(ep: EpisodeDef): Promise<void> {
+     is left untouched. Each file is streamed so onChunk can drive the load bar. */
+  private async loadData(
+    files: { name: string; dest: string; url: string }[],
+    onChunk: (delta: number, label: string) => void,
+  ): Promise<void> {
     const m = this.m;
     if (!m) return;
-    for (const name of ep.dataFiles) {
-      const dest = "/" + name.toUpperCase();
+    for (const { name, dest, url } of files) {
       if (m.FS.analyzePath(dest).exists) continue; // preloaded build
-      const url = new URL(`${DATA_BASE}/${ep.id}/${name}`, document.baseURI).href;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`game data fetch failed: ${name} (HTTP ${res.status})`);
-      // A missing file is often answered with the SPA fallback index.html (HTTP
-      // 200, text/html). Refuse it instead of writing the HTML page into MEMFS as
-      // if it were game data (which would boot the engine into a black screen).
-      if ((res.headers.get("content-type") || "").includes("text/html")) {
-        throw new Error(`game data missing for ${ep.id}: ${name} (server returned the HTML fallback, not the file)`);
-      }
-      m.FS.writeFile(dest, new Uint8Array(await res.arrayBuffer()));
+      const bytes = await fetchWithProgress(url, (delta) => onChunk(delta, name));
+      m.FS.writeFile(dest, bytes);
     }
   }
 
@@ -412,4 +466,51 @@ export class WasmEngine {
     try { this.audioNode?.disconnect(); } catch { /* noop */ }
     try { void this.audioCtx?.close(); } catch { /* noop */ }
   }
+}
+
+/** Best-effort byte size of a URL via HEAD (for the load bar's total). Returns
+    0 when the request fails or the host doesn't send Content-Length, which the
+    caller treats as "unknown" (indeterminate bar). */
+async function contentLength(url: string): Promise<number> {
+  try {
+    const res = await fetch(url, { method: "HEAD" });
+    if (!res.ok) return 0;
+    const n = Number(res.headers.get("content-length"));
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** Fetch a URL into a Uint8Array, invoking onChunk(deltaBytes) as the body
+    streams in so callers can drive a progress bar. Rejects the SPA HTML
+    fallback (HTTP 200 + text/html) that some static hosts return for a missing
+    file — writing that page into MEMFS as if it were game data boots the engine
+    to a black screen. */
+async function fetchWithProgress(url: string, onChunk: (delta: number) => void): Promise<Uint8Array> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`fetch failed: ${url} (HTTP ${res.status})`);
+  if ((res.headers.get("content-type") || "").includes("text/html")) {
+    throw new Error(`asset missing: ${url} (server returned the HTML fallback, not the file)`);
+  }
+  if (!res.body) {
+    // No streaming body available — fall back to a single buffered read.
+    const buf = new Uint8Array(await res.arrayBuffer());
+    onChunk(buf.length);
+    return buf;
+  }
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    size += value.length;
+    onChunk(value.length);
+  }
+  const out = new Uint8Array(size);
+  let off = 0;
+  for (const c of chunks) { out.set(c, off); off += c.length; }
+  return out;
 }
