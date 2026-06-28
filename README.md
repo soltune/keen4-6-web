@@ -46,22 +46,26 @@ legally-owned data (see below).
 git clone https://github.com/soltune/keen4-6-web.git
 ```
 
-Put each episode's DOS files into `dos/ck4`, `dos/ck5`, `dos/ck6`.
+**CK4 ships ready to play** — its shareware data is already bundled in the repo, so a fresh
+clone runs CK4 with no extra steps. You only need to supply data for **CK5 and CK6**: put each
+episode's DOS files into `dos/ck5` and `dos/ck6` (the `dos/ck4` folder can stay empty).
 
 ```
-dos/ck4/
-├── KEEN4E.EXE      ← EGA EXE (used to extract headers/dictionaries; CK5=KEEN5E.EXE / CK6=Keen6.exe)
-├── EGAGRAPH.CK4    ← graphics
-├── GAMEMAPS.CK4    ← maps
-└── AUDIO.CK4       ← audio
+dos/ck5/
+├── KEEN5E.EXE      ← EGA EXE (used to extract headers/dictionaries; CK6=Keen6.exe)
+├── EGAGRAPH.CK5    ← graphics
+├── GAMEMAPS.CK5    ← maps
+└── AUDIO.CK5       ← audio
 ```
 
-### 2. Extract the data
+### 2. Extract the data (CK5 / CK6 only)
 
 ```bash
 cd keen4-6-web/web && npm install
 npm run extract
 ```
+
+> Skip this step if you only want to play CK4 — its data is already extracted in the repo.
 
 ### 3. Run
 
@@ -69,7 +73,8 @@ npm run extract
 npm run dev                          # dev server → http://localhost:5173/
 ```
 
-Open it in your browser, **select CK4 / CK5 / CK6**, then press **Space** at the title screen to start.
+Open it in your browser, **select CK4 / CK5 / CK6** (CK5/CK6 stay greyed-out until you've added
+their data), then press **Space** at the title screen to start.
 
 ### 4. Production build (static files for hosting)
 
@@ -95,9 +100,17 @@ Deploy `dist/` to any static host.
 | Pogo stick | `Alt` |
 | Fire (stunner) / Start | `Space` |
 | Confirm menu | `Enter` |
+| Status / score panel | `Enter` |
 | Pause | `P` |
-| Help / status | `F1` |
+| Help screens | `F1` (CK4 / CK5 only) |
+| Main menu (control panel) | `F2`–`F7` / `Esc` |
+| Boss key (hide to a fake `C:>` prompt; `Esc` restores) | `F9` |
+| Rewind — hold to wind back time | `Backspace` |
 | Toggle fullscreen | `F` |
+
+> **Rewind** is a web-port addition: holding the key rewinds up to ~15 seconds within the
+> current level (disabled during demos). Keys are **rebindable** — open the **⌨** panel
+> (top-right) to remap any action live; the table above lists the defaults.
 
 ### Gamepad (USB / Bluetooth, hot-plug supported)
 
@@ -106,9 +119,12 @@ Controllers are auto-detected even if connected after the game starts (standard 
 | Action | Button |
 |---|---|
 | Move | D-pad / left stick |
-| Jump / confirm | A |
-| Pogo / back | B |
-| Fire | X / Y |
+| Jump / confirm menu | A |
+| Pogo | B |
+| Fire | X |
+| Status / score | Y |
+| Menu / back | Start / Select |
+| Rewind — hold to wind back time | L1 / L2 |
 
 ### Virtual pad (mobile / touch)
 
@@ -119,7 +135,8 @@ Use the on-screen direction pad and buttons. Toggle it with the **🎮** button 
 | Button | Function |
 |---|---|
 | ⛶ | Toggle fullscreen |
-| ▣ | Toggle aspect ratio (4:3 ↔ pixel-perfect) |
+| ⚙ | Display settings — CRT/scaling shaders, aspect ratio (4:3 ↔ 1:1 pixel-perfect), integer scaling |
+| ⌨ | Controls — remap keyboard bindings (applies live, persists) |
 | 🎮 | Show/hide the virtual pad |
 
 ### Saving
@@ -165,7 +182,7 @@ keen4-6/
 │   └── port/             ← build & link scripts (build.sh / link.sh)
 ├── web/                  ← web app (Vite + TypeScript)
 │   ├── public/engine/    ← prebuilt engines keen{4,5,6}.{js,wasm}
-│   ├── public/data/      ← extracted data (git-ignored)
+│   ├── public/data/      ← extracted data (ck4 bundled in the repo; ck5/ck6 you add yourself)
 │   └── test/             ← verification harnesses
 └── README.md
 ```
