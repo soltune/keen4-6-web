@@ -41,6 +41,7 @@ export function chooseEpisode(initialId?: string): Promise<EpisodeDef> {
           Menu: <kbd>←</kbd><kbd>→</kbd> Select / <kbd>Enter</kbd> Confirm ·
           In game: <kbd>Ctrl</kbd> Jump <kbd>Alt</kbd> Pogo <kbd>Space</kbd> Fire ·
           <kbd>F</kbd> Fullscreen<br />
+          Hold <kbd>Backspace</kbd> (gamepad <kbd>L1</kbd>/<kbd>L2</kbd>) to rewind your game — up to ~15&nbsp;s within a level.<br />
           Only episodes with extracted data can be selected — add yours under <code>dos/</code>, run <code>npm&nbsp;run&nbsp;extract</code>, then reload.
         </p>
         <div class="save-tools">

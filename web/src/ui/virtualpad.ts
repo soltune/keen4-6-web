@@ -34,6 +34,7 @@ const ACTIONS: PadButton[] = [
 const META: PadButton[] = [
   { label: "STATUS", cls: "vp-pill", keys: ["status"] },
   { label: "MENU", cls: "vp-pill", keys: ["back"] },
+  { label: "REWIND", cls: "vp-pill", keys: ["rewind"] },
 ];
 
 export class VirtualPad {
