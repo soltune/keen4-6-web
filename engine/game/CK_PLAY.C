@@ -330,6 +330,17 @@ void PicturePause(void)
 		return;
 	}
 
+#ifdef __EMSCRIPTEN__
+	/* [web port] The DOS screenshot path tears down every ID manager and
+	   exit()s to DOS for an external grab tool, then busy-waits on bioskey()
+	   for Esc. In the browser there is no DOS to return to, the manager
+	   teardown would leave the game unrunnable, and the bioskey() wait (stub
+	   returns 0, never yields) hard-freezes the tab. Consume the key and
+	   return; the canvas can be captured directly. */
+	IN_ClearKeysDown();
+	return;
+#endif
+
 	SD_PlaySound(SND_JUMP);
 	SD_WaitSoundDone();
 
@@ -864,6 +875,30 @@ void CheckKeys(void)
 //
 		if (LastScan == sc_F9)
 		{
+#ifdef __EMSCRIPTEN__
+			/* [web port] There is no BIOS text mode in the browser, so the
+			   original VW_Shutdown()/cputs("C:>") path leaves the frozen game
+			   frame on screen. Emulate the DOS boss screen in EGA graphics
+			   mode: blank to black and draw the "C:>" prompt, restore on Esc.
+			   The Esc wait yields every pass (ASYNCIFY) so it never freezes. */
+			SD_MusicOff();
+			VW_ColorBorder(BLACK);
+			VW_ClearVideo(BLACK);
+			fontnumber = 0;
+			fontcolor = 7;			/* DOS light-gray on black */
+			WindowX = PrintX = 0;
+			PrintY = 0;
+			US_Print("C:>");
+			VW_UpdateScreen();
+			IN_ClearKeysDown();
+			while (LastScan != sc_Escape)
+				CKWEB_Yield();
+			VW_ColorBorder(bordercolor);
+			RF_ForceRefresh();
+			IN_ClearKeysDown();
+			lasttimecount = TimeCount;
+			SD_MusicOn();
+#else
 			VW_Shutdown();
 			SD_MusicOff();
 			cputs("C:>");
@@ -875,6 +910,7 @@ void CheckKeys(void)
 			IN_ClearKeysDown();
 			lasttimecount = TimeCount;	// BUG: should be the other way around
 			SD_MusicOn();
+#endif
 		}
 	}
 

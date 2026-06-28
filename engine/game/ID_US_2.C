@@ -617,10 +617,15 @@ USL_CtlDialog(char *s1,char *s2,char *s3)
 			c = sc_Escape;
 		else
 			c = LastScan;
+		/* [web port] yield so the keypress/cursor is pumped (ASYNCIFY).
+		   Without this LastScan never updates and the dialog spins the tab
+		   into a hard freeze — this is the END GAME / confirm-dialog hang. */
+		CKWEB_Yield();
 	} while (c == sc_None);
 	do
 	{
 		IN_ReadCursor(&cursorinfo);
+		CKWEB_Yield();	/* [web port] yield so the button-release is pumped */
 	} while (cursorinfo.button0 || cursorinfo.button1);
 
 	IN_ClearKeysDown();
@@ -862,6 +867,7 @@ USL_CKSetKey(UserItem far *item,word i)
 		{
 			IN_ReadCursor(&cursorinfo);
 			LastScan = sc_Escape;
+			CKWEB_Yield();	/* [web port] yield so the button-release is pumped */
 		}
 
 		/* [web port] no ISR to guard against (single-threaded). */
@@ -2123,6 +2129,7 @@ extern void HelpScreens(void);
 				do
 				{
 					IN_ReadCursor(&cursorinfo);
+					CKWEB_Yield();	/* [web port] yield so the button-release is pumped */
 				} while (cursorinfo.button0);
 				USL_DoItem();
 				resetitem = true;
@@ -2132,6 +2139,7 @@ extern void HelpScreens(void);
 				do
 				{
 					IN_ReadCursor(&cursorinfo);
+					CKWEB_Yield();	/* [web port] yield so the button-release is pumped */
 				} while (cursorinfo.button1);
 				USL_UpLevel();
 				resetitem = true;
