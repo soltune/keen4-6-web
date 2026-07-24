@@ -12,12 +12,18 @@ compatible.
 | `crt-lottes.glsl` | CRT (Lottes) | Timothy Lottes | Public Domain |
 | `crt-easymode.glsl` | CRT (EasyMode) | EasyMode | GPL |
 | `crt-geom.glsl` | CRT (Geom) — curvature/geometry | cgwg, Themaister, DOLLS | GPL-2.0+ |
-| `crt-gdv-mini.glsl` | CRT (GDV mini) | guest(r), ed. metallic77 | GPL-2.0+ |
+| `crt-gdv-mini-ultra-trinitron.glsl` | CRT (GDV mini ultra, Trinitron preset)¹ | guest(r), DariusG | GPL-2.0+ |
 | `scanlines-sine-abs.glsl` | Scanlines | RiskyJumps | Public Domain |
 | `xbrz-freescale.glsl` | xBRZ freescale (smooth upscale) | Hyllian (sergiogdb) | MIT |
 
 All licenses (Public Domain / MIT / GPL-2.0+) are compatible with this project's
 GPL-2.0-or-later. Each file retains its original header.
+
+¹ Not verbatim: ported here from
+[libretro/slang-shaders](https://github.com/libretro/slang-shaders)
+`crt/shaders/crt-gdv-mini-ultra.slang` (single pass) into the same libretro
+GLSL form as the rest; the `crt-gdv-mini-ultra-trinitron.slangp` preset equals
+the shader's default parameters.
 
 Upstream: <https://github.com/libretro/glsl-shaders>
 - `crt/` · `scanlines/` · `xbrz/`

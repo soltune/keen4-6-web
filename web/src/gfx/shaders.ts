@@ -18,7 +18,7 @@
 import crtLottesGlsl from "./shaders/crt-lottes.glsl?raw"; // Public Domain (T. Lottes)
 import crtEasymodeGlsl from "./shaders/crt-easymode.glsl?raw"; // GPL (EasyMode)
 import crtGeomGlsl from "./shaders/crt-geom.glsl?raw"; // GPL (cgwg/Themaister/DOLLS) — curvature/geometry
-import crtGdvMiniGlsl from "./shaders/crt-gdv-mini.glsl?raw"; // GPL (guest(r)/metallic77) — GDV mini
+import crtGdvMiniUltraGlsl from "./shaders/crt-gdv-mini-ultra-trinitron.glsl?raw"; // GPL (guest(r)/DariusG) — GDV mini ultra, Trinitron preset (ported from slang)
 import scanlinesSineGlsl from "./shaders/scanlines-sine-abs.glsl?raw"; // Public Domain (RiskyJumps)
 import xbrzGlsl from "./shaders/xbrz-freescale.glsl?raw"; // MIT (Hyllian)
 import lcdDotmatrixGlsl from "./shaders/lcd-dotmatrix.glsl?raw"; // Public Domain — handheld LCD grid, color-preserving
@@ -92,7 +92,8 @@ void main() {
   "crt-lottes": { libretro: crtLottesGlsl, filterLinear: false },
   "crt-easymode": { libretro: crtEasymodeGlsl, filterLinear: false },
   "crt-geom": { libretro: crtGeomGlsl, filterLinear: false, parameterUniform: true }, // filter_linear0=false; needs PARAMETER_UNIFORM (lum collision)
-  "crt-gdv-mini": { libretro: crtGdvMiniGlsl, filterLinear: true }, // .glslp filter_linear0 = true
+  // .slangp sets no filter_linear; sampling is at texel centers so it's moot — NEAREST.
+  "crt-gdv-mini-ultra-trinitron": { libretro: crtGdvMiniUltraGlsl, filterLinear: false },
   "scanlines-sine-abs": { libretro: scanlinesSineGlsl, filterLinear: false },
   "xbrz-freescale": { libretro: xbrzGlsl, filterLinear: false },
   // Handheld dot-matrix LCD (single-pass, no extra textures). NEAREST source so
@@ -163,7 +164,7 @@ export const SHADER_PRESETS: ShaderPreset[] = [
   { id: "crt-lottes", label: "crt-lottes" },
   { id: "crt-easymode", label: "crt-easymode" },
   { id: "crt-geom", label: "crt-geom" },
-  { id: "crt-gdv-mini", label: "crt-gdv-mini" },
+  { id: "crt-gdv-mini-ultra-trinitron", label: "crt-gdv-mini-ultra-trinitron" },
   { id: "scanlines-sine-abs", label: "scanlines-sine-abs" },
   { id: "xbrz-freescale", label: "xbrz-freescale" },
   { id: "lcd-dotmatrix", label: "lcd-dotmatrix" },
