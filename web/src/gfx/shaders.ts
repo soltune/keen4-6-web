@@ -1,28 +1,34 @@
 /* ===========================================================================
-   Minimal shader registry / runtime for the WebGL2 renderer.
+   Minimal shader registry for the WebGL2 renderer.
 
-   Each entry is a single-pass program (vertex + fragment, GLSL ES 1.00 — which
-   WebGL2 compiles fine). Programs follow the libretro GLSL uniform convention
-   (MVPMatrix / Texture / TextureSize / InputSize / OutputSize / FrameCount) so
-   that ported libretro shaders slot in here unchanged save for a thin prelude.
+   Each entry is one pass or a chain of passes (vertex + fragment, GLSL ES
+   1.00 — which WebGL2 compiles fine). Programs follow the libretro GLSL
+   uniform convention (MVPMatrix / Texture / TextureSize / InputSize /
+   OutputSize / FrameCount) so that ported libretro shaders slot in here
+   unchanged save for a thin prelude. Multi-pass presets list their passes in
+   preset order; execution, FBOs and cross-pass texture binding live in
+   pipeline.ts (ShaderPipeline).
 
-   Today: 'passthrough' only (proves the pipeline). Ported OSS presets
-   (crt-lottes [Public Domain], crt-pi, zfast-crt, ...) are added here next,
-   each parsing its `#pragma parameter` defaults into `params`. Ported shaders
-   keep their original license headers; an aggregate listing lives in web/CREDITS.
+   Ported shaders keep their original license headers; an aggregate listing
+   lives in CREDITS.md, each parsing its `#pragma parameter` defaults into
+   `params` when parameterUniform is set.
    =========================================================================== */
 
 // Verbatim libretro/glsl-shaders sources (see web/CREDITS for authors/licenses).
 // Each is a single GLSL source guarded by VERTEX/FRAGMENT and uses its built-in
 // default parameters when PARAMETER_UNIFORM is left undefined.
-import crtLottesGlsl from "./shaders/crt-lottes.glsl?raw"; // Public Domain (T. Lottes)
-import crtEasymodeGlsl from "./shaders/crt-easymode.glsl?raw"; // GPL (EasyMode)
 import crtGeomGlsl from "./shaders/crt-geom.glsl?raw"; // GPL (cgwg/Themaister/DOLLS) — curvature/geometry
 import crtGdvMiniUltraGlsl from "./shaders/crt-gdv-mini-ultra-trinitron.glsl?raw"; // GPL (guest(r)/DariusG) — GDV mini ultra, Trinitron preset (ported from slang)
 import scanlinesSineGlsl from "./shaders/scanlines-sine-abs.glsl?raw"; // Public Domain (RiskyJumps)
 import xbrzGlsl from "./shaders/xbrz-freescale.glsl?raw"; // MIT (Hyllian)
 import lcdDotmatrixGlsl from "./shaders/lcd-dotmatrix.glsl?raw"; // Public Domain — handheld LCD grid, color-preserving
 import gbDmgGreenGlsl from "./shaders/gb-dmg-green.glsl?raw"; // Public Domain — Game Boy DMG 4-tone green + grid
+// newpixie CRT (MIT/Unlicense, Mattias Gustavsson; slang adaptation hunterk) —
+// 4-pass chain: accumulate (feedback) → H/V blur → compose. Ported from slang.
+import npAccumulateGlsl from "./shaders/newpixie/accumulate.glsl?raw";
+import npBlurHorizGlsl from "./shaders/newpixie/blur-horiz.glsl?raw";
+import npBlurVertGlsl from "./shaders/newpixie/blur-vert.glsl?raw";
+import npFinalGlsl from "./shaders/newpixie/newpixie-crt.glsl?raw";
 
 export interface ShaderParam {
   name: string;
@@ -35,12 +41,14 @@ export interface ShaderPreset {
   label: string;
 }
 
-export interface ShaderDef {
-  id: string;
+/** One compiled pass of a preset (single-pass presets have exactly one). */
+export interface ShaderPassDef {
   program: WebGLProgram;
   params: ShaderParam[];
   /** Source-texture sampling: GL_LINEAR (true) vs GL_NEAREST (false). */
   filterLinear: boolean;
+  /** Preset-scoped name later passes bind this pass's output by (slang aliasN). */
+  alias: string | null;
 }
 
 interface ShaderSource {
@@ -59,6 +67,9 @@ interface ShaderSource {
    * which only compiles when `lum` is a uniform that the local can shadow).
    */
   parameterUniform?: boolean;
+  /** Multi-pass preset: passes in preset order (last one renders to screen).
+      Mutually exclusive with the single-pass fields above. */
+  passes?: { libretro: string; alias?: string; filterLinear?: boolean; parameterUniform?: boolean }[];
 }
 
 const PRECISION = `#ifdef GL_ES
@@ -89,8 +100,6 @@ void main() {
   // Ported OSS presets. Each is single-pass and runs with its built-in default
   // parameters (PARAMETER_UNIFORM stays undefined). `filterLinear` mirrors the
   // upstream .glslp `filter_linear0`. See CREDITS.md for authors/licenses.
-  "crt-lottes": { libretro: crtLottesGlsl, filterLinear: false },
-  "crt-easymode": { libretro: crtEasymodeGlsl, filterLinear: false },
   "crt-geom": { libretro: crtGeomGlsl, filterLinear: false, parameterUniform: true }, // filter_linear0=false; needs PARAMETER_UNIFORM (lum collision)
   // .slangp sets no filter_linear; sampling is at texel centers so it's moot — NEAREST.
   "crt-gdv-mini-ultra-trinitron": { libretro: crtGdvMiniUltraGlsl, filterLinear: false },
@@ -100,6 +109,18 @@ void main() {
   // each 320x200 texel reads as one crisp LCD dot.
   "lcd-dotmatrix": { libretro: lcdDotmatrixGlsl, filterLinear: false },
   "gb-dmg-green": { libretro: gbDmgGreenGlsl, filterLinear: false },
+  // 4-pass chain mirroring upstream newpixie-crt.slangp (all filter_linearN =
+  // true, intermediates at scale_type source 1.0). accumulate's ghost trail
+  // reads blur1's previous frame (PassFeedback1); the final pass composes
+  // accum1 + blur2. The upstream bezel texture stays off (use_frame 0.0).
+  "newpixie-crt": {
+    passes: [
+      { libretro: npAccumulateGlsl, alias: "accum1", filterLinear: true },
+      { libretro: npBlurHorizGlsl, alias: "blur1", filterLinear: true },
+      { libretro: npBlurVertGlsl, alias: "blur2", filterLinear: true },
+      { libretro: npFinalGlsl, filterLinear: true },
+    ],
+  },
 };
 
 /**
@@ -161,14 +182,13 @@ export const SHADER_PRESETS: ShaderPreset[] = [
   { id: null, label: "Original" }, // no shader (raw output)
   // Each preset shows its upstream libretro shader name (the repo filename),
   // which is more recognizable / searchable than a feature description.
-  { id: "crt-lottes", label: "crt-lottes" },
-  { id: "crt-easymode", label: "crt-easymode" },
   { id: "crt-geom", label: "crt-geom" },
   { id: "crt-gdv-mini-ultra-trinitron", label: "crt-gdv-mini-ultra-trinitron" },
   { id: "scanlines-sine-abs", label: "scanlines-sine-abs" },
   { id: "xbrz-freescale", label: "xbrz-freescale" },
   { id: "lcd-dotmatrix", label: "lcd-dotmatrix" },
   { id: "gb-dmg-green", label: "gb-dmg-green" },
+  { id: "newpixie-crt", label: "newpixie-crt" },
 ];
 
 /** Ids of all registered shaders (verification harnesses enumerate these). */
@@ -176,36 +196,54 @@ export function listShaders(): string[] {
   return Object.keys(SOURCES);
 }
 
-/** Compile + link a shader by id (caller owns deletion of the returned program). */
-export function getShaderProgram(gl: WebGL2RenderingContext, id: string): ShaderDef {
+/** Compile + link one libretro single-file source (with the ES 3.00 retry). */
+function buildLibretro(gl: WebGL2RenderingContext, glsl: string, parameterUniform: boolean): WebGLProgram {
+  try {
+    const s = splitLibretro(glsl, false, parameterUniform);
+    return link(gl, s.vertex, s.fragment);
+  } catch (firstErr) {
+    // Some shaders need ES 3.00 (array constructors, etc.) despite their
+    // declared #version. Retry once forcing ES 3.00; else report the original.
+    try {
+      const s3 = splitLibretro(glsl, true, parameterUniform);
+      return link(gl, s3.vertex, s3.fragment);
+    } catch {
+      throw firstErr;
+    }
+  }
+}
+
+/**
+ * Compile + link a preset's pass chain by id (single-pass presets return one
+ * entry). The caller owns deletion of the returned programs; ShaderPipeline
+ * is the intended consumer.
+ */
+export function getShaderPasses(gl: WebGL2RenderingContext, id: string): ShaderPassDef[] {
   const src = SOURCES[id];
   if (!src) throw new Error(`Unknown shader: ${id}`);
-  let program: WebGLProgram;
-  if (src.libretro) {
-    const pu = src.parameterUniform ?? false;
-    try {
-      const s = splitLibretro(src.libretro, false, pu);
-      program = link(gl, s.vertex, s.fragment);
-    } catch (firstErr) {
-      // Some shaders need ES 3.00 (array constructors, etc.) despite their
-      // declared #version. Retry once forcing ES 3.00; else report the original.
-      try {
-        const s3 = splitLibretro(src.libretro, true, pu);
-        program = link(gl, s3.vertex, s3.fragment);
-      } catch {
-        throw firstErr;
-      }
-    }
-  } else {
-    program = link(gl, src.vertex!, src.fragment!);
+
+  if (src.passes) {
+    return src.passes.map((p) => {
+      const pu = p.parameterUniform ?? false;
+      return {
+        program: buildLibretro(gl, p.libretro, pu),
+        params: pu ? parsePragmaParams(p.libretro) : [],
+        filterLinear: p.filterLinear ?? false,
+        alias: p.alias ?? null,
+      };
+    });
   }
-  return {
-    id,
+
+  const program = src.libretro
+    ? buildLibretro(gl, src.libretro, src.parameterUniform ?? false)
+    : link(gl, src.vertex!, src.fragment!);
+  return [{
     program,
     // With parameterUniform, feed the shader its #pragma defaults as uniforms.
     params: src.parameterUniform ? parsePragmaParams(src.libretro!) : (src.params ?? []),
     filterLinear: src.filterLinear ?? false,
-  };
+    alias: null,
+  }];
 }
 
 function compile(gl: WebGL2RenderingContext, type: number, source: string): WebGLShader {

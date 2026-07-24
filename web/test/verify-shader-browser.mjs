@@ -2,6 +2,10 @@
    Loads the page, drives into a level, then cycles every registered shader
    preset and confirms for each: it activates (no silent fallback to 2D) and the
    rendered canvas changes vs the plain path — with no page/console errors.
+   Then chains preset→preset switches WITHOUT resetting to Original in between
+   (same GL context, pipeline swap): state leaking across pipelines fails draws
+   with a WebGL INVALID_* console warning and a black canvas, which the per-
+   preset loop above can't see because it returns to baseline each time.
    Saves a screenshot per preset.
    Usage: node verify-shader-browser.mjs [ck4|ck5|ck6]   (dev server on :5173) */
 import { chromium } from "playwright";
@@ -12,7 +16,12 @@ const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
-page.on("console", (m) => { if (m.type() === "error") errors.push("console:" + m.text()); });
+page.on("console", (m) => {
+  if (m.type() === "error") errors.push("console:" + m.text());
+  // GL draw/state failures surface as warnings (e.g. "WebGL: INVALID_OPERATION:
+  // drawArrays: ..."); driver *performance* notes (GPU stall etc.) are noise.
+  if (m.type() === "warning" && /WebGL: INVALID_/.test(m.text())) errors.push("console:" + m.text());
+});
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const st = (w) => page.evaluate((w) => window.__keenEngine?.state(w) ?? -9, w);
@@ -58,7 +67,25 @@ try {
     await sleep(150);
   }
 
-  const allOk = supported ? results.every((r) => r.activated && r.changed) : true;
+  // Direct preset→preset chain (no Original in between; ends on a wrap-around
+  // to the first preset so a multi→single edge is always covered). Consecutive
+  // steps must differ — two black frames in a row compare equal and fail.
+  let chainOk = true;
+  if (supported && presets.length > 1) {
+    let prev = await shot();
+    for (const id of [...presets, presets[0]]) {
+      const applied = await setShader(id);
+      await sleep(350);
+      const cur = await shot();
+      const ok = applied === id && !prev.equals(cur);
+      if (!ok) { chainOk = false; console.log(`[${ep}]  chain ->${id}: activated=${applied === id} changed=${!prev.equals(cur)} ⚠️`); }
+      prev = cur;
+    }
+    console.log(`[${ep}] direct-switch chain: ${chainOk ? "OK" : "⚠️ FAILED"}`);
+    await setShader(null);
+  }
+
+  const allOk = (supported ? results.every((r) => r.activated && r.changed) : true) && chainOk;
   if (!supported) console.log(`[${ep}] NOTE: WebGL2 unavailable; shader path falls back to 2D (some headless setups).`);
   console.log(`[${ep}] RESULT: ${allOk ? "ALL SHADER PRESETS OK ✅" : "⚠️ needs review"}`);
   console.log(`[${ep}] page errors: ${errors.length ? errors.slice(0, 6).join(" | ") : "none"}`);
